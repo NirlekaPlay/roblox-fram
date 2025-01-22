@@ -15,14 +15,16 @@ export type SoundState = {
 	isLoaded: boolean,
 	volume: number,
 	position: number,
-	length: number
+	length: number,
+	deferredStartTime: number?
 }
 
 export type SoundConfig = {
 	autoPlay: boolean?,
 	volume: number?,
 	destroyOnFinished: boolean?,
-	parent: Instance?
+	parent: Instance?,
+	deferred: boolean?  -- New config option for deferred playback
 }
 
 local SoundPlayer = {}
@@ -41,10 +43,10 @@ function SoundPlayer.new(soundId: string, config: SoundConfig?)
 		isLoaded = false,
 		volume = self._config.volume or 1,
 		position = 0,
-		length = 0
+		length = 0,
+		deferredStartTime = nil
 	}
 
-	-- Create our events
 	self._events = {
 		loaded = Signal.new(),
 		started = Signal.new(),
@@ -63,9 +65,13 @@ function SoundPlayer.new(soundId: string, config: SoundConfig?)
 	self._maid:GiveTask(self._sound)
 
 	if self._config.autoPlay then
-		self:Preload():andThen(function()
-			self:Play()
-		end)
+		if self._config.deferred then
+			self:PlayDeferred()
+		else
+			self:Preload():andThen(function()
+				self:Play()
+			end)
+		end
 	end
 
 	return self
@@ -99,6 +105,48 @@ function SoundPlayer:Preload()
 	end)
 
 	return self._loadPromise
+end
+
+function SoundPlayer:PlayDeferred()
+	self._state.deferredStartTime = tick()
+
+	return self:Preload():andThen(function()
+		if not self._state.isPlaying and self._state.deferredStartTime then
+			local elapsedTime = tick() - self._state.deferredStartTime
+
+			if elapsedTime < self._sound.TimeLength then
+				self._sound.Parent = self._config.parent or workspace
+				self._sound.TimePosition = elapsedTime  -- Start from the time that has elapsed
+				self._sound:Play()
+				self._state.isPlaying = true
+
+				-- Set up monitoring of sound position
+				self._maid:GiveTask(RunService.Heartbeat:Connect(function()
+					self._state.position = self._sound.TimePosition
+					self:_updateState()
+				end))
+
+				-- Handle completion
+				self._maid:GiveTask(self._sound.Ended:Connect(function()
+					self._state.isPlaying = false
+					self._events.finished:Fire()
+					self:_updateState()
+
+					if self._config.destroyOnFinished then
+						self:Destroy()
+					end
+				end))
+
+				self._events.started:Fire()
+				self:_updateState()
+			else
+				self._events.finished:Fire()
+				if self._config.destroyOnFinished then
+					self:Destroy()
+				end
+			end
+		end
+	end)
 end
 
 function SoundPlayer:Play()
