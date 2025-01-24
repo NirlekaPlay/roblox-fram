@@ -9,16 +9,21 @@
 
 local ContentProvider = game:GetService("ContentProvider")
 
-local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
-local Promise = require("Promise")
-
 local Provider = {}
+
+--[[
+	Due to for some reason, there is a high chance of failure when loading a non-image asset.
+	Leaving them as an Instance makes the chance of success higher.
+]]
+local CONTENT_PROPERTIES_IGNORE = {
+	Sound = {"SoundId"},
+	Animation = {"AnimationId"}
+}
 
 local CONTENT_PROPERTIES = {
 	MeshPart = {"TextureID", "MeshID"},
 	Decal = {"Texture"},
 	Texture = {"Texture"},
-	Sound = {"SoundId"},
 	ParticleEmitter = {"Texture"},
 	Trail = {"Texture"},
 	Beam = {"Texture"},
@@ -31,24 +36,11 @@ local CONTENT_PROPERTIES = {
 	SpecialMesh = {"TextureId"},
 }
 
--- Configuration for retry behavior
-local DEFAULT_CONFIG = {
-	maxRetries = -1,           -- -1 means infinite retries
-	retryDelay = 1,           -- Delay between retries in seconds
-	exponentialBackoff = true, -- Whether to increase delay between retries
-	maxDelay = 30,            -- Maximum delay between retries in seconds
-	logErrors = true          -- Whether to log error messages
+local PARENTS_TO_SEARCH = {
+	game:GetService("Workspace"),
+	game:GetService("SoundService"),
+	game:GetService("ReplicatedStorage").Images
 }
-
-local function calculateBackoff(baseDelay: number, attempt: number, maxDelay: number): number
-	if attempt <= 1 then
-	return baseDelay
-	end
-	-- Calculate exponential delay: baseDelay * 2^(attempt-1)
-	local delay = baseDelay * math.pow(2, attempt - 1)
-	-- Ensure we don't exceed maxDelay
-	return math.min(delay, maxDelay)
-end
 
 local processedAssets = {}
 
@@ -63,7 +55,11 @@ local function extractContentUrls(instance)
 	local urls = {}
 
 	local properties = CONTENT_PROPERTIES[instance.ClassName]
-	if not properties then return urls end
+	if CONTENT_PROPERTIES_IGNORE then
+		return {instance}
+	elseif not properties then
+		return nil
+	end
 
 	for _, prop in ipairs(properties) do
 		local success, result = pcall(function()
@@ -85,112 +81,23 @@ end
 local function collectAssets(container: Instance)
 	local assets = {}
 
-	for _, child in ipairs(container:GetDescendants()) do
-		if CONTENT_PROPERTIES[child.ClassName] then
-			local urls = extractContentUrls(child)
+	for _, child in ipairs(container:GetChildren()) do
+		local urls = extractContentUrls(child)
+		if urls then
 			for _, url in ipairs(urls) do
 				table.insert(assets, url)
+			end
+		end
+
+		if child:IsA("Folder") or child:IsA("Model") then
+			local childAssets = collectAssets(child)
+			for _, asset in ipairs(childAssets) do
+				table.insert(assets, asset)
 			end
 		end
 	end
 
 	return assets
-end
-
---[=[
-	Main function to load an asset with retries
-
-	@param asset: string | Instance - The asset to load
-	@param config: table? - Optional configuration for retry behavior
-	@return Promise that resolves when asset is loaded or rejects if max retries reached
-]=]
-function Provider.LoadAssetWithRetry(asset: string | Instance, config: table?)
-	-- Merge provided config with default config
-	local settings = table.clone(DEFAULT_CONFIG)
-	if config then
-	for key, value in pairs(config) do
-		settings[key] = value
-		end
-	end
-
-	return Promise.new(function(resolve, reject)
-	local attempts = 0
-
-	local function attemptLoad()
-		attempts += 1
-
-		-- Log attempt if logging is enabled
-		if settings.logErrors then
-		print(string.format("[ContentLoader] Attempt %d to load asset: %s",
-			attempts,
-			typeof(asset) == "string" and asset or asset.Name))
-		end
-
-		-- Attempt to preload the asset
-		local success, result = pcall(function()
-		local status
-		ContentProvider:PreloadAsync({asset}, function(_, loadStatus)
-			status = loadStatus
-		end)
-		return status
-		end)
-
-		-- Handle the loading result
-		if success and result == Enum.AssetFetchStatus.Success then
-		-- Asset loaded successfully
-		resolve(asset)
-		else
-		-- Loading failed - handle retry logic
-		local errorMsg = string.format("Failed to load asset (Attempt %d): %s",
-			attempts,
-			if success then result else tostring(result))
-
-		if settings.logErrors then
-			warn(errorMsg)
-		end
-
-		-- Check if we should retry
-		if settings.maxRetries == -1 or attempts < settings.maxRetries then
-			-- Calculate delay for next attempt
-			local delay = if settings.exponentialBackoff
-			then calculateBackoff(settings.retryDelay, attempts, settings.maxDelay)
-			else settings.retryDelay
-
-			-- Log retry information
-			if settings.logErrors then
-			print(string.format("[ContentLoader] Retrying in %.1f seconds...", delay))
-			end
-
-			-- Wait and retry
-			task.wait(delay)
-			attemptLoad()
-		else
-			-- Max retries reached - reject the promise
-			reject(string.format("Max retries (%d) reached. %s", settings.maxRetries, errorMsg))
-		end
-		end
-	end
-
-	attemptLoad()
-	end)
-end
-
-function Provider.LoadAssetInfinite(asset: string | Instance)
-	return Provider.LoadAssetWithRetry(asset, {
-	maxRetries = -1,
-	retryDelay = 1,
-	exponentialBackoff = true,
-	logErrors = true
-	})
-end
-
-function Provider.LoadAssetLimited(asset: string | Instance, maxAttempts: number)
-	return Provider.LoadAssetWithRetry(asset, {
-	maxRetries = maxAttempts,
-	retryDelay = 1,
-	exponentialBackoff = true,
-	logErrors = true
-	})
 end
 
 function Provider.AwaitAssetsAsync(assets)
@@ -236,7 +143,7 @@ function Provider.AwaitAssetsAsync(assets)
 		#failed_assets,
 		elapsed,
 		max_assets / elapsed
-		))
+	))
 
 	return loaded_assets, timedout_assets, failed_assets
 end
@@ -246,16 +153,8 @@ function Provider.AwaitAllAssetsAsync()
 
 	local assets = {}
 
-	for _, asset in ipairs(collectAssets(workspace)) do
-		table.insert(assets, asset)
-	end
-
-	for _, asset in ipairs(collectAssets(game:GetService("SoundService"))) do
-		table.insert(assets, asset)
-	end
-
-	if game.ReplicatedStorage:FindFirstChild("Images") then
-		for _, asset in ipairs(collectAssets(game.ReplicatedStorage.Images)) do
+	for _, parent in ipairs(PARENTS_TO_SEARCH) do
+		for _, asset in ipairs(collectAssets(parent)) do
 			table.insert(assets, asset)
 		end
 	end

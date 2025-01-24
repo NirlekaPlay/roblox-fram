@@ -5,8 +5,9 @@
 local RunService = game:GetService("RunService")
 local Provider = require(game.ReplicatedStorage.Modules._index.Service.Provider)
 
-local requiredModules = {}
-local runServiceModules = {}
+local acquired_modules = {}
+local required_modules = {}
+local run_service_modules = {}
 
 local dasar_string_header = ":: Dasar :: "
 local dasar_is_started = false
@@ -27,29 +28,29 @@ local function findModule(moduleName)
 	return nil
 end
 
-local function initializeModule(module)
+local function initializeModule(module, moduleName)
 	local moduleConstructor = module["new"]
 	local moduleRun = module["_run"]
 	local moduleReady = module["_ready"]
-	if moduleConstructor then
-		if type(moduleConstructor) == "function" then
-			return
-		end
+
+	if moduleConstructor and type(moduleConstructor) == "function" then
+		return
 	end
 
-	if moduleRun then
-		if type(moduleRun) == "function" then
-			table.insert(requiredModules, moduleRun)
-			return
-		end
+	if moduleRun and type(moduleRun) == "function" then
+		table.insert(run_service_modules, moduleRun)
 	end
 
-	if moduleReady then
-		if type(moduleReady) == "function" then
-			task.spawn(function()
-				pcall(moduleReady)
-			end)
-		end
+	if moduleReady and type(moduleReady) == "function" then
+		task.spawn(function()
+			warn(string.format(dasar_string_header .. "Initializing module '%s'", moduleName))
+			local success, err = pcall(moduleReady)
+			if not success then
+				warn(dasar_string_header .. "Module initialization error: " .. tostring(err))
+			else
+				warn(string.format(dasar_string_header .. "Initialized module  '%s'", moduleName))
+			end
+		end)
 	end
 end
 
@@ -65,11 +66,6 @@ local Dasar = {}
 ]=]
 function Dasar.Require(moduleName: string)
 	assert(type(moduleName) == "string", string.format(dasar_string_header.."'moduleName' parameter must be a string. Got %s", typeof(moduleName)))
-	--[[if not dasar_is_started then
-		repeat
-			task.wait()
-		until dasar_is_started
-	end]]
 
 	local module = findModule(moduleName)
 	if not module then
@@ -82,7 +78,7 @@ end
 
 --[=[
 	Initializes all modules.
-	Meaning all modules are equired, if a module has a _run or _ready functions
+	Meaning all modules are required, if a module has a _run or _ready functions
 	will be called.
 ]=]
 function Dasar.Start()
@@ -91,22 +87,20 @@ function Dasar.Start()
 
 	Provider.AwaitAllAssetsAsync()
 
-	for _, location in ipairs(moduleLocations) do
+	for _, location: Instance in ipairs(moduleLocations) do
 		for _, module in ipairs(location:GetDescendants()) do
 			if module:IsA("ModuleScript") then
-				task.spawn(function()
-					requiredModules[module.Name] = require(module)
-				end)
+				table.insert(acquired_modules, module)
 			end
 		end
 	end
 
-	for _, module in pairs(requiredModules) do
-		initializeModule(module)
+	for _, module in ipairs(acquired_modules) do
+		initializeModule(require(module), module.Name)
 	end
 
 	RunService.Heartbeat:Connect(function()
-		for _, func in pairs(runServiceModules) do
+		for _, func in pairs(run_service_modules) do
 			func()
 		end
 	end)
