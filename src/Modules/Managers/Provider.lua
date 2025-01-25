@@ -100,6 +100,16 @@ local function collectAssets(container: Instance)
 	return assets
 end
 
+function Provider.PreloadAsyncDescendants(parent: Instance)
+	local assets = {}
+
+	for _, asset in ipairs(collectAssets(parent)) do
+		table.insert(assets, asset)
+	end
+
+	return Provider.AwaitAssetsAsync(assets)
+end
+
 function Provider.AwaitAssetsAsync(assets)
 	waitForGameLoaded()
 
