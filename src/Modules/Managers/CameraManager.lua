@@ -22,7 +22,7 @@ local currentFov : number
 local currentSocket : string
 local dur = 1.5
 local elapsed = 0
-local mouse = game.Players:GetMouse()
+local mouse = game.Players.LocalPlayer:GetMouse()
 local moving = false
 local socketArray = CameraSocket.fromArray(SceneManager.GetCurrentSceneCameraSockets())
 local speaker_pan

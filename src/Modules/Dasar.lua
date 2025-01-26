@@ -83,7 +83,11 @@ end
 ]=]
 function Dasar.Start()
 	if dasar_is_started or dasar_is_starting then return end
+	local finnished = false
+	local totalError = 0
+	local startTime = tick()
 	dasar_is_starting = true
+	warn(dasar_string_header.."Initializing Dasar. . .")
 
 	Provider.AwaitAllAssetsAsync()
 
@@ -95,8 +99,22 @@ function Dasar.Start()
 		end
 	end
 
-	for _, module in ipairs(acquired_modules) do
-		initializeModule(require(module), module.Name)
+	for i, module in ipairs(acquired_modules) do
+		task.spawn(function()
+			local success, message = pcall(function()
+				initializeModule(require(module), module.Name)
+			end)
+
+			if not success then
+				warn(string.format(dasar_string_header .. "Error initializing module '%s': %s", module.Name, tostring(message)))
+				totalError += 1
+			end
+
+			if i == #acquired_modules then
+				finnished = true
+				warn(string.format(dasar_string_header.."All modules loaded. Time: %d secs, Errors: %d", tick() - startTime, totalError))
+			end
+		end)
 	end
 
 	RunService.Heartbeat:Connect(function()
