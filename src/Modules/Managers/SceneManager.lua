@@ -1,6 +1,11 @@
--- SceneManager.lua
--- NirlekaDev
--- January 25, 2024
+--[[
+		// FileName: SceneManager.lua
+		// Written by: NirlekaDev
+		// Description:
+				Manages scene loading.
+
+				CLIENT ONLY.
+]]
 
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
 
@@ -12,6 +17,8 @@ local scenes_array = {}
 local current_loaded_scene = nil
 
 local SceneManager = {}
+SceneManager.ClassName = "SceneManager"
+SceneManager.RunContext = "Client"
 
 function SceneManager._ready()
 	for _, inst in ipairs(folder_storage_scenes:GetChildren()) do
@@ -20,6 +27,13 @@ function SceneManager._ready()
 		end
 
 		scenes_array[inst.Name] = inst
+	end
+
+	for _, inst in ipairs(folder_workspace_scenes:GetChildren()) do
+		if inst:IsA("Folder") then
+			scenes_array[inst.Name] = inst
+			SceneManager.LoadScene(inst.Name)
+		end
 	end
 end
 
@@ -36,6 +50,8 @@ function SceneManager.LoadScene(alias: string)
 	Provider.PreloadAsyncDescendants(scene)
 	current_loaded_scene = scene
 	scene.Parent = folder_workspace_scenes
+
+	warn(string.format(":: SceneManager :: Scene '%s' loaded.", alias))
 
 	return scene
 end

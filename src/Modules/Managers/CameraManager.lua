@@ -1,10 +1,12 @@
--- CameraManager.lua
--- Nirleka Dev
--- January 25, 2025
-
 --[[
-	A replacement to Camera.lua
-	OOP stripped.
+		// FileName: CameraManager.lua
+		// Written by: NirlekaDev
+		// Description:
+				A replacement from the Camera.lua class.
+				Enables direct interaction with the camera,
+				instead of having to create another class of it.
+
+				CLIENT ONLY.
 ]]
 
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
@@ -35,6 +37,8 @@ local ease = MathLib.ease
 local lerp = MathLib.lerp
 
 local CameraManager = {}
+CameraManager.ClassName = "CameraManager"
+CameraManager.RunContext = "Client"
 
 function CameraManager._ready()
 	camera.CameraType = Enum.CameraType.Scriptable
@@ -98,6 +102,5 @@ function CameraManager.TiltCameraToMouse()
 		)
 	end
 end
-
 
 return CameraManager

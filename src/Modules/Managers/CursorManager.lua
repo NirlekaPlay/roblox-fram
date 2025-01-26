@@ -1,21 +1,35 @@
--- CursorManager.lua
--- NirlekaDev
--- December 5, 2024
+--[[
+		// FileName: CursorManager.lua
+		// Written by: NirlekaDev
+		// Description:
+				Manages the mouse cursor,
+				including the icon, and it's behaviour.
+
+				CLIENT ONLY.
+]]
 
 local UserInputService = game:GetService("UserInputService")
 
-local images = game.Players.LocalPlayer.PlayerScripts.Client.Images
+local images = game.ReplicatedStorage.Images
 local sound: Sound = game.SoundService.Isolated.mouse_show
 local cursor_point : ImageLabel = images.mouse_point
 local cursor_hover : ImageLabel = images.mouse_hover
 local cursor_invalid : ImageLabel = images.mouse_invalid
 local cursor_icons = {cursor_point, cursor_hover, cursor_invalid}
 local cursor_visible = false
+local cursor_lock_center = true
 
 local CursorManager = {}
 
 function CursorManager._ready()
 	CursorManager.SetCursor(false, false)
+	CursorManager.SetCursorLock(true)
+end
+
+function CursorManager._run()
+	if cursor_lock_center then
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+	end
 end
 
 function CursorManager.SetCursor(isVisible: boolean, playSound: boolean)
@@ -23,6 +37,13 @@ function CursorManager.SetCursor(isVisible: boolean, playSound: boolean)
 	UserInputService.MouseIconEnabled = isVisible
 	if playSound then
 		sound:Play()
+	end
+end
+
+function CursorManager.SetCursorLock(booelan)
+	cursor_lock_center = booelan
+	if not booelan then
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 	end
 end
 

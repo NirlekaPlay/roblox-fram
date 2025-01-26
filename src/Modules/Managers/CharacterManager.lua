@@ -1,16 +1,19 @@
--- CharacterManager.lua
--- NirlekaDev
--- January 24, 2025
-
 --[[
-	Manages all things related to the player's character.
+		// FileName: CharacterManager.lua
+		// Written by: NirlekaDev
+		// Description:
+				Manages all things on the player's character.
+				Currently only manages the head turning relative
+				to the camera's position.
+
+				CLIENT ONLY.
 ]]
 
 local Players = game:GetService("Players")
 
 local local_player = Players.LocalPlayer
 local camera = workspace.CurrentCamera or workspace.Camera
-local turn_head = true
+local turn_head = false
 local connections = {}
 
 local SETTINGS = {
@@ -39,6 +42,8 @@ local function characterSetup(character)
 end
 
 local CharacterManager = {}
+CharacterManager.ClassName = "CharacterManager"
+CharacterManager.RunContext = "Client"
 
 function CharacterManager._ready()
 	local character = local_player.Character

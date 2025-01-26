@@ -1,10 +1,19 @@
--- SkyManager.lua
--- NirlekaDev
--- January 25, 2024
+--[[
+		// FileName: SkyManager.lua
+		// Written by: NirlekaDev
+		// Description:
+				Manages the sky. Currently only
+				matches the client's local time to the Sky's
+				time of day.
+
+				CLIENT ONLY.
+]]
 
 local Lighting = game:GetService("Lighting")
 
 local SkyManager = {}
+SkyManager.ClassName = "SkyManager"
+SkyManager.RunContext = "Client"
 
 function SkyManager._run()
 	SkyManager.SyncTimeOfDay()

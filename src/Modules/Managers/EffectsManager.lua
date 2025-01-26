@@ -1,28 +1,20 @@
--- EffectsManager.lua
--- NirlekaDev
--- January 18, 2024
-
 --[[
-	Handles all effects on the client.
+		// FileName: EffectsManager.lua
+		// Written by: NirlekaDev
+		// Description:
+				Manages visual effects on the client.
+
+				CLIENT ONLY.
 ]]
 
+local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local GuiService = game:GetService("GuiService")
 
 local Camera = workspace.Camera or workspace.CurrentCamera
 
-local function newInstance(name, parent, properties): Instance
-	local instance = Instance.new(name)
-
-	if properties then
-		for k, v in pairs(properties) do
-			instance[k] = v
-		end
-	end
-	instance.Parent = parent
-
-	return instance
-end
+local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
+local newInstance = require("inst").create
 
 local SETTINGS = {
 	DefaultBlurOnEscOpen = 16
@@ -33,8 +25,8 @@ local TWEEN_INFOS = {
 }
 
 local EFFECTS_OBJECTS = {
-	Blur = newInstance("BlurEffect", Camera, {Size = 0}),
-	CC = newInstance("ColorCorrectionEffect", Camera)
+	Blur = newInstance("BlurEffect", nil, Camera, {Size = 0}),
+	CC = newInstance("ColorCorrectionEffect", nil, Camera)
 }
 
 local ANIMATIONS = {
@@ -77,22 +69,32 @@ export type TweenInfoStack = {
 }
 
 local EffectsManager = {}
+EffectsManager.ClassName = "EffectsManager"
+EffectsManager.RunContext = "Client"
 
 function EffectsManager._ready()
-	if GuiService.MenuIsOpen then
-		Player_Values.IsMenuOpened = true
-		EffectsManager.PlayAnimationAlias("FocusReleasedGreyBlur")
-	else
-		Player_Values.IsMenuOpened = false
-		EffectsManager.PlayAnimationAlias("FocusGainedGreyBlur")
+	local function handleFocusChange(isFocused)
+		Player_Values.IsMenuOpened = isFocused
+		local animationAlias = isFocused and "FocusReleasedGreyBlur" or "FocusGainedGreyBlur"
+		EffectsManager.PlayAnimationAlias(animationAlias)
 	end
+
+	handleFocusChange(GuiService.MenuIsOpen)
+
 	GuiService.MenuOpened:Connect(function()
-		Player_Values.IsMenuOpened = true
-		EffectsManager.PlayAnimationAlias("FocusReleasedGreyBlur")
+		handleFocusChange(true)
 	end)
+
 	GuiService.MenuClosed:Connect(function()
-		Player_Values.IsMenuOpened = false
-		EffectsManager.PlayAnimationAlias("FocusGainedGreyBlur")
+		handleFocusChange(false)
+	end)
+
+	UserInputService.WindowFocused:Connect(function()
+		handleFocusChange(true)
+	end)
+
+	UserInputService.WindowFocusReleased:Connect(function()
+		handleFocusChange(false)
 	end)
 end
 
