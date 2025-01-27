@@ -28,9 +28,9 @@ end
 function CameraSocket.fromArray(array: {BasePart})
 	local socketTable = {}
 
-	for i, part in pairs(array) do
+	for _, part in pairs(array) do
 		local newSocket = CameraSocket.fromPart(part, part:GetAttribute("fov"))
-		socketTable[i] = newSocket
+		socketTable[newSocket.socketName] = newSocket
 	end
 
 	return socketTable

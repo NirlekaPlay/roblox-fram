@@ -60,15 +60,20 @@ function SoundPlayer.new(sound: string | Sound, properties: {[string]:any}?)
 	self.deffered_playing = false
 	self.sound = nil
 	self.sound_group = nil
-	self.pitch_scale = 1
+	self.pitch_scale = 0
 	self.playing = false
 	self.play_paused = false
 	self.volume_db = 1
 	self.last_time_pos = 0
 
+	self._pitch_sfx = nil
 	self._maid = Maid.new()
 
 	if typeof(sound) == "Instance" then
+		if not sound:IsA("Sound") then
+			return
+		end
+
 		self.sound = sound
 		if not sound.SoundGroup then
 			sound.SoundGroup = SoundService.World
@@ -81,6 +86,10 @@ function SoundPlayer.new(sound: string | Sound, properties: {[string]:any}?)
 		self.sound.SoundId = sound
 		self.sound_group = SoundService.Isolated
 		self.sound.Parent = SoundService.Isolated
+
+		self._pitch_sfx = Instance.new("PitchShiftSoundEffect")
+		self._pitch_sfx.Octave = self.pitch_scale
+		self._pitch_sfx.Parent = self.sound
 	end
 
 	if properties then
@@ -90,6 +99,7 @@ function SoundPlayer.new(sound: string | Sound, properties: {[string]:any}?)
 	end
 
 	self._maid:GiveTask(self.sound)
+	self._maid:GiveTask(self._pitch_sfx)
 	self._maid:GiveTask(sound.Stopped:Connect(function()
 		self.playing = false
 	end))
@@ -100,7 +110,7 @@ function SoundPlayer.new(sound: string | Sound, properties: {[string]:any}?)
 
 	self.__newindex = function(_, i, v)
 		strictTypeSet(self, i, v)
-		if i == "playing" or "play_paused" then
+		if i == ("playing" or "play_paused") then
 			if i then
 				self:Play(self.last_time_pos)
 			else
@@ -109,6 +119,9 @@ function SoundPlayer.new(sound: string | Sound, properties: {[string]:any}?)
 					self:Stop()
 				end
 			end
+			return
+		elseif i == "pitch_scale" then
+			self._pitch_sfx.Octave = v
 		end
 	end
 

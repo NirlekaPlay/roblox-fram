@@ -24,7 +24,7 @@ local dur = 1.5
 local elapsed = 0
 local mouse = game.Players.LocalPlayer:GetMouse()
 local moving = false
-local socketArray = CameraSocket.fromArray(SceneManager.GetCurrentSceneCameraSockets())
+local socketArray
 local speaker_pan
 local tiltMouse = false
 
@@ -42,10 +42,30 @@ CameraManager.RunContext = "Client"
 
 function CameraManager._ready()
 	camera.CameraType = Enum.CameraType.Scriptable
+	if SceneManager:IsSceneLoaded() then
+		socketArray = CameraSocket.fromArray(SceneManager.GetCurrentSceneCameraSockets())
+	end
+	SceneManager.SceneLoaded:Connect(function()
+		socketArray = CameraSocket.fromArray(SceneManager.GetCurrentSceneCameraSockets())
+	end)
 end
 
 function CameraManager._run(dt)
 	CameraManager.LerpMovement(dt)
+	CameraManager.TiltCameraToMouse()
+end
+
+function CameraManager.SetTiltCamera(value: boolean)
+	tiltMouse = value
+end
+
+function CameraManager.SetSocket(socketName)
+	local activeSocket = socketArray[socketName]
+	if activeSocket then
+		currentSocket = activeSocket
+		camera.CFrame = activeSocket.cframe
+		camera.FieldOfView = activeSocket.fov
+	end
 end
 
 function CameraManager.BeginLerp(socketName: string, playSound: boolean)

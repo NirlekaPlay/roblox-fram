@@ -10,23 +10,19 @@
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
 
 local Provider = require("Provider")
+local Signal = require("Signal")
 
 local folder_storage_scenes = game.ReplicatedStorage.Scenes
 local folder_workspace_scenes = workspace.Scenes
 local scenes_array = {}
 local current_loaded_scene = nil
-local loading = true
-local firstTimeLoading = true
-
-local function waitForLoad()
-	if loading then
-		repeat task.wait() until not loading
-	end
-end
+local ready = false
 
 local SceneManager = {}
 SceneManager.ClassName = "SceneManager"
 SceneManager.RunContext = "Client"
+SceneManager.SceneLoaded = Signal.new()
+SceneManager.Ready = Signal.new()
 
 function SceneManager._ready()
 	for _, inst in ipairs(folder_storage_scenes:GetChildren()) do
@@ -44,11 +40,19 @@ function SceneManager._ready()
 		end
 	end
 
-	loading = false
+	ready = true
+	SceneManager.Ready:Fire()
+end
+
+function SceneManager:IsSceneLoaded()
+	return current_loaded_scene ~= nil
+end
+
+function SceneManager:IsManagerReady()
+	return ready
 end
 
 function SceneManager.LoadScene(alias: string)
-	waitForLoad()
 	local scene = scenes_array[alias]
 	if not scene then
 		error(string.format(":: SceneManager :: Scene '%s' does not exist.", alias))
@@ -58,30 +62,23 @@ function SceneManager.LoadScene(alias: string)
 		return
 	end
 
-	if current_loaded_scene then
-		current_loaded_scene.Parent = folder_storage_scenes
-		current_loaded_scene = nil
-	end
-	Provider.PreloadAsyncDescendants(scene)
-	current_loaded_scene = scene
-	scene.Parent = folder_workspace_scenes
+	task.spawn(function()
+		if current_loaded_scene then
+			current_loaded_scene.Parent = folder_storage_scenes
+			current_loaded_scene = nil
+		end
+		Provider.PreloadAsyncDescendants(scene)
+		current_loaded_scene = scene
+		scene.Parent = folder_workspace_scenes
 
-	if firstTimeLoading then
-		firstTimeLoading = false
-	end
+		SceneManager.SceneLoaded:Fire(scene)
+		warn(string.format(":: SceneManager :: Scene '%s' loaded.", alias))
+	end)
 
-	warn(string.format(":: SceneManager :: Scene '%s' loaded.", alias))
-
-	return scene
+	return SceneManager.SceneLoaded
 end
 
 function SceneManager.GetCurrentSceneCameraSockets()
-	waitForLoad()
-	if firstTimeLoading then
-		repeat
-			task.wait()
-		until current_loaded_scene
-	end
 	if not current_loaded_scene then
 		error(string.format(":: SceneManager :: Failed to get camera sockets. There is no scene loaded."))
 	end
