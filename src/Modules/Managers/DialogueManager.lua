@@ -1,6 +1,8 @@
 --[[
 		// FileName: DialogueManager.lua
 		// Written by: NirlekaDev | Mike
+		// Description:
+						Manages the text of the dialogue UI.
 
 				CLIENT ONLY.
 ]]
@@ -15,18 +17,16 @@ local ui = game.Players.LocalPlayer.PlayerGui:WaitForChild("Dialogue").root
 local speaker_click = ssp2d.new(SoundService.Isolated.dialogue)
 local dialogueUI = ui.dialogue_backdropUI.text
 local dialogueUI_backdrop = ui.dialogue_backdropUI
-local dialogueSpeed = 1
+
+local current_text = ""
 local incrementDelay = 0.05
+local looping = false
 
 local BASE_DELAYS = {
 	["."] = 0.3,
 	[","] = 0.2,
 	["|"] = 1.0
 }
-
-local current_text = ""
-local looping = false
-local DialogueManager = {}
 
 local function processFormatting(text)
 	local segments = {}
@@ -105,19 +105,15 @@ local function cleanText(text)
 	return text
 end
 
+local DialogueManager = {}
+
 function DialogueManager.ShowText_ForDuration(activeText, showDuration)
-	looping = false
-	DialogueManager.ShowDialogue()
-	dialogueUI.Text = activeText
-	current_text = activeText
-	looping = true
-	DialogueManager.TickText()
+	DialogueManager.ShowText_Forever(activeText)
 	task.wait(showDuration)
 	DialogueManager.HideDialogue()
 end
 
 function DialogueManager.ShowText_Forever(activeText)
-	looping = false
 	DialogueManager.ShowDialogue()
 	dialogueUI.Text = activeText
 	current_text = activeText
@@ -132,8 +128,15 @@ function DialogueManager.HideDialogue()
 end
 
 function DialogueManager.ShowDialogue()
+	looping = false
 	dialogueUI.Visible = true
 	dialogueUI_backdrop.Visible = true
+end
+
+function DialogueManager.Skip()
+	if looping then
+		DialogueManager.HideDialogue()
+	end
 end
 
 function DialogueManager.PlaySequence(sequenceText)
@@ -181,39 +184,40 @@ function DialogueManager.TickText()
 			dialogueUI.Text = displayedText
 			speaker_click.pitch_scale = math.random(0.2, 0.6)
 			speaker_click:Play()
-		else
-			local i = 1
-			while i <= #segment.text do
-				if not looping then break end
+			continue
+		end
 
-				local char = segment.text:sub(i, i)
+		local i = 1
+		while i <= #segment.text do
+			if not looping then break end
 
-				local pauseTime, skipCount, removeChar = calculatePauseDuration(segment.text, i)
+			local char = segment.text:sub(i, i)
 
-				if pauseTime > 0 then
-					if not removeChar then
-						displayedText = displayedText .. char
-						dialogueUI.Text = displayedText
-					end
-					i = i + skipCount
-				else
+			local pauseTime, skipCount, removeChar = calculatePauseDuration(segment.text, i)
+
+			if pauseTime > 0 then
+				if not removeChar then
 					displayedText = displayedText .. char
 					dialogueUI.Text = displayedText
+				end
+				i = i + skipCount
+			else
+				displayedText = displayedText .. char
+				dialogueUI.Text = displayedText
 
-					if not char:match("[%p%s]") then
-						speaker_click.pitch_scale = math.random(0.2, 0.6)
-						speaker_click:Play()
-					end
-
-					i = i + 1
+				if not char:match("[%p%s]") then
+					speaker_click.pitch_scale = math.random(0.2, 0.6)
+					speaker_click:Play()
 				end
 
-				local targetDelay = pauseTime > 0 and pauseTime or incrementDelay
-				while accumulatedTime < targetDelay do
-					accumulatedTime = accumulatedTime + RunService.Heartbeat:Wait()
-				end
-				accumulatedTime = accumulatedTime - targetDelay
+				i = i + 1
 			end
+
+			local targetDelay = pauseTime > 0 and pauseTime or incrementDelay
+			while accumulatedTime < targetDelay do
+				accumulatedTime = accumulatedTime + RunService.Heartbeat:Wait()
+			end
+			accumulatedTime = accumulatedTime - targetDelay
 		end
 	end
 

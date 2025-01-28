@@ -11,7 +11,7 @@
 local UserInputService = game:GetService("UserInputService")
 
 local images = game.ReplicatedStorage.Images
-local sound: Sound = game.SoundService.Isolated.mouse_show
+local sound: Sound = game.SoundService.Isolated.beep
 local cursor_point : ImageLabel = images.mouse_point
 local cursor_hover : ImageLabel = images.mouse_hover
 local cursor_invalid : ImageLabel = images.mouse_invalid
@@ -23,6 +23,7 @@ local CursorManager = {}
 
 function CursorManager._ready()
 	CursorManager.SetCursor(false, false)
+	CursorManager.SetCursorImage("point")
 	CursorManager.SetCursorLock(true)
 end
 
