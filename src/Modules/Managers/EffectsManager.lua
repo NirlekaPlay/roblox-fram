@@ -75,18 +75,23 @@ EffectsManager.RunContext = "Client"
 function EffectsManager._ready()
 	local function handleFocusChange(isFocused)
 		Player_Values.IsMenuOpened = isFocused
-		local animationAlias = isFocused and "FocusReleasedGreyBlur" or "FocusGainedGreyBlur"
+		local animationAlias
+		if isFocused then
+			animationAlias = "FocusGainedGreyBlur"
+		else
+			animationAlias = "FocusReleasedGreyBlur"
+		end
 		EffectsManager.PlayAnimationAlias(animationAlias)
 	end
 
 	handleFocusChange(GuiService.MenuIsOpen)
 
 	GuiService.MenuOpened:Connect(function()
-		handleFocusChange(true)
+		handleFocusChange(false)
 	end)
 
 	GuiService.MenuClosed:Connect(function()
-		handleFocusChange(false)
+		handleFocusChange(true)
 	end)
 
 	UserInputService.WindowFocused:Connect(function()
