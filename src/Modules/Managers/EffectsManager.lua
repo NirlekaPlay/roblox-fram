@@ -21,7 +21,8 @@ local SETTINGS = {
 }
 
 local TWEEN_INFOS = {
-	TweenInfoExp = TweenInfo.new(1, Enum.EasingStyle.Exponential)
+	TweenInfoExp = TweenInfo.new(1, Enum.EasingStyle.Exponential),
+	TweenInfoInstant = TweenInfo.new(0.3, Enum.EasingStyle.Exponential),
 }
 
 local EFFECTS_OBJECTS = {
@@ -52,6 +53,20 @@ local ANIMATIONS = {
 			instance = EFFECTS_OBJECTS.CC,
 			tweenInfo = TWEEN_INFOS.TweenInfoExp,
 			properties = {Contrast = 0, Saturation = 0}
+		}
+	},
+	LightShutOff = {
+		{
+			instance = EFFECTS_OBJECTS.CC,
+			tweenInfo = TWEEN_INFOS.TweenInfoInstant,
+			properties = {Brightness = -1}
+		}
+	},
+	FadeOut = {
+		{
+			instance = EFFECTS_OBJECTS.CC,
+			tweenInfo = TWEEN_INFOS.TweenInfoExp,
+			properties = {Brightness = -1}
 		}
 	}
 }
