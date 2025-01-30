@@ -24,6 +24,17 @@ SceneManager.RunContext = "Client"
 SceneManager.SceneLoaded = Signal.new()
 SceneManager.Ready = Signal.new()
 
+local function preloadSceneAssets(scene_folder)
+	task.spawn(function()
+		Provider.PreloadAsyncDescendants(scene_folder)
+		current_loaded_scene = scene_folder
+		scene_folder.Parent = folder_workspace_scenes
+
+		SceneManager.SceneLoaded:Fire(scene_folder)
+		warn(string.format(":: SceneManager :: Scene '%s' loaded.", scene_folder))
+	end)
+end
+
 function SceneManager._ready()
 	for _, inst in ipairs(folder_storage_scenes:GetChildren()) do
 		if not inst:IsA("Folder") then
@@ -35,8 +46,7 @@ function SceneManager._ready()
 
 	for _, inst in ipairs(folder_workspace_scenes:GetChildren()) do
 		if inst:IsA("Folder") then
-			scenes_array[inst.Name] = inst
-			SceneManager.LoadScene(inst.Name)
+			SceneManager.LoadCurrentWorkspaceScene(inst)
 		end
 	end
 
@@ -62,18 +72,25 @@ function SceneManager.LoadScene(alias: string)
 		return
 	end
 
-	task.spawn(function()
-		if current_loaded_scene then
-			current_loaded_scene.Parent = folder_storage_scenes
-			current_loaded_scene = nil
-		end
-		Provider.PreloadAsyncDescendants(scene)
-		current_loaded_scene = scene
-		scene.Parent = folder_workspace_scenes
+	if current_loaded_scene then
+		current_loaded_scene.Parent = folder_storage_scenes
+		current_loaded_scene = nil
+	end
 
-		SceneManager.SceneLoaded:Fire(scene)
-		warn(string.format(":: SceneManager :: Scene '%s' loaded.", alias))
-	end)
+	preloadSceneAssets(scene)
+
+	return SceneManager.SceneLoaded
+end
+
+function SceneManager.LoadCurrentWorkspaceScene(scene_folder: Folder)
+	scenes_array[scene_folder.Name] = scene_folder
+
+	if current_loaded_scene then
+		current_loaded_scene.Parent = folder_storage_scenes
+		current_loaded_scene = nil
+	end
+
+	preloadSceneAssets(scene_folder)
 
 	return SceneManager.SceneLoaded
 end

@@ -84,7 +84,7 @@ function EffectsManager._ready()
 		EffectsManager.PlayAnimationAlias(animationAlias)
 	end
 
-	handleFocusChange(GuiService.MenuIsOpen)
+	handleFocusChange((GuiService.MenuIsOpen ~= true))
 
 	GuiService.MenuOpened:Connect(function()
 		handleFocusChange(false)
