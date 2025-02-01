@@ -19,9 +19,9 @@ function Middleware._ready()
 	else
 		FOLDER_REMOTE_FUNCTIONS = instLibrary.create("Folder", "MiddleWareRemoteFuncs", ReplicatedStorage)
 		REMOTE_FUNCTION = instLibrary.create("RemoteFunction", nil, FOLDER_REMOTE_FUNCTIONS)
-		local FOLDER_TEMP = instLibrary.create("Folder", "temp", ReplicatedStorage)
+		FOLDER_TEMP = instLibrary.create("Folder", "temp", ReplicatedStorage)
 
-		REMOTE_FUNCTION.OnServerInvoke = function(_, requestName)
+		REMOTE_FUNCTION.OnServerInvoke = function(plr: Player, requestName: string)
 			if requestName == "GetServerStorageChildren" then
 				local children = ServerStorage:GetChildren()
 				local shits = {}
@@ -31,6 +31,10 @@ function Middleware._ready()
 				end
 
 				return shits
+			elseif requestName == "LoadLocalCharacter" then
+				plr:LoadCharacter()
+
+				return plr.Character
 			end
 		end
 	end
@@ -44,6 +48,12 @@ function Middleware.GetServerStorageContent()
 		else
 			warn(":: Middleware :: Attempt to get contents of ServerStorage failed: "..errorMsg)
 		end
+	end
+end
+
+function Middleware.LoadLocalCharacter()
+	if RunService:IsClient() then
+		REMOTE_FUNCTION:InvokeServer("LoadLocalCharacter")
 	end
 end
 

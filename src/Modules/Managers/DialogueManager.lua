@@ -45,11 +45,21 @@ local function processFormatting(text)
 
 			local endUnderscore = text:find("_", startUnderscore + 1)
 			if endUnderscore then
+				local word = text:sub(startUnderscore + 1, endUnderscore - 1)
+
+				local nextCharIndex = endUnderscore + 1
+				local spaces = ""
+				while nextCharIndex <= #text and text:sub(nextCharIndex, nextCharIndex) == " " do
+					spaces = spaces .. " "
+					nextCharIndex = nextCharIndex + 1
+				end
+
 				table.insert(segments, {
-					text = text:sub(startUnderscore + 1, endUnderscore - 1),
+					text = word .. spaces,
 					skip = true
 				})
-				currentIndex = endUnderscore + 1
+
+				currentIndex = nextCharIndex
 			else
 				table.insert(segments, {
 					text = text:sub(currentIndex),
@@ -68,6 +78,7 @@ local function processFormatting(text)
 
 	return segments
 end
+
 
 local function calculatePauseDuration(text, index)
 	local char = text:sub(index, index)
@@ -176,6 +187,8 @@ function DialogueManager.TickText()
 	local segments = processFormatting(current_text)
 	local displayedText = ""
 
+	print(segments)
+
 	for _, segment in ipairs(segments) do
 		if not looping then break end
 
@@ -192,6 +205,13 @@ function DialogueManager.TickText()
 			if not looping then break end
 
 			local char = segment.text:sub(i, i)
+
+			if char == " " and segments[_ - 1] and segments[_ - 1].skip then
+				displayedText = displayedText .. char
+				dialogueUI.Text = displayedText
+				i = i + 1
+				continue
+			end
 
 			local pauseTime, skipCount, removeChar = calculatePauseDuration(segment.text, i)
 

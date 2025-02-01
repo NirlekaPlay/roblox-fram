@@ -21,7 +21,7 @@ local Config = {
 	SHAKE = {
 		REQUIRED_CYCLES = 1,          -- Number of left-right cycles needed
 		ANGLE_THRESHOLD = 0.04,       -- Minimum angle change to register movement
-		TIME_WINDOW = 2,             -- Time window to complete the gesture
+		TIME_WINDOW = 3,             -- Time window to complete the gesture
 		COOLDOWN = 0.1,              -- Minimum time between detected shakes
 		DIAGONAL_TOLERANCE = 0.6      -- How much diagonal movement is allowed (0-1)
 	}

@@ -9,9 +9,11 @@
 ]]
 
 local UserInputService = game:GetService("UserInputService")
+local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
+local ssp2d = require("SoundStreamPlayer2D")
 
 local images = game.ReplicatedStorage.Images
-local sound: Sound = game.SoundService.Isolated.beep
+local speaker_mouseShow = ssp2d.new(game.SoundService.Isolated.swipe)
 local cursor_point : ImageLabel = images.mouse_point
 local cursor_hover : ImageLabel = images.mouse_hover
 local cursor_invalid : ImageLabel = images.mouse_invalid
@@ -37,7 +39,7 @@ function CursorManager.SetCursor(isVisible: boolean, playSound: boolean)
 	cursor_visible = isVisible
 	UserInputService.MouseIconEnabled = isVisible
 	if playSound then
-		sound:Play()
+		speaker_mouseShow:Play()
 	end
 end
 

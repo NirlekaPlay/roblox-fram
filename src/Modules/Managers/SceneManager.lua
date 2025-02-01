@@ -31,7 +31,7 @@ local function preloadSceneAssets(scene_folder)
 		scene_folder.Parent = folder_workspace_scenes
 
 		SceneManager.SceneLoaded:Fire(scene_folder)
-		warn(string.format(":: SceneManager :: Scene '%s' loaded.", scene_folder))
+		warn(string.format(":: SceneManager :: Scene '%s' loaded.", scene_folder.Name))
 	end)
 end
 

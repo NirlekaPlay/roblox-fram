@@ -11,12 +11,20 @@
 
 local Lighting = game:GetService("Lighting")
 
+local sync_time = true
+local clock_time_aliases = {
+	midnight = 0,
+	day = 12
+}
+
 local SkyManager = {}
 SkyManager.ClassName = "SkyManager"
 SkyManager.RunContext = "Client"
 
 function SkyManager._run()
-	SkyManager.SyncTimeOfDay()
+	if sync_time then
+		SkyManager.SyncTimeOfDay()
+	end
 end
 
 function SkyManager.getTimeOfDay()
@@ -28,7 +36,18 @@ function SkyManager.getTimeOfDay()
 end
 
 function SkyManager.SyncTimeOfDay()
+	if not sync_time then
+		sync_time = true
+	end
 	Lighting.ClockTime = SkyManager.getTimeOfDay()
+end
+
+function SkyManager.SetTimeOfDay(alias: string)
+	local clock_time = clock_time_aliases[alias]
+	if clock_time then
+		sync_time = false
+		Lighting.ClockTime = clock_time
+	end
 end
 
 return SkyManager

@@ -27,7 +27,8 @@ local TWEEN_INFOS = {
 
 local EFFECTS_OBJECTS = {
 	Blur = newInstance("BlurEffect", nil, Camera, {Size = 0}),
-	CC = newInstance("ColorCorrectionEffect", nil, Camera)
+	CC = newInstance("ColorCorrectionEffect", nil, Camera),
+	CCOcclude = newInstance("ColorCorrectionEffect", nil, Camera)
 }
 
 local ANIMATIONS = {
@@ -57,14 +58,21 @@ local ANIMATIONS = {
 	},
 	LightShutOff = {
 		{
-			instance = EFFECTS_OBJECTS.CC,
+			instance = EFFECTS_OBJECTS.CCOcclude,
 			tweenInfo = TWEEN_INFOS.TweenInfoInstant,
 			properties = {Brightness = -1}
 		}
 	},
+	LightShutOn = {
+		{
+			instance = EFFECTS_OBJECTS.CCOcclude,
+			tweenInfo = TWEEN_INFOS.TweenInfoInstant,
+			properties = {Brightness = 0}
+		}
+	},
 	FadeOut = {
 		{
-			instance = EFFECTS_OBJECTS.CC,
+			instance = EFFECTS_OBJECTS.CCOcclude,
 			tweenInfo = TWEEN_INFOS.TweenInfoExp,
 			properties = {Brightness = -1}
 		}
@@ -74,6 +82,7 @@ local ANIMATIONS = {
 local Player_Values = {
 	IsMouseLock = true,
 	IsMenuOpened = false,
+	IsWindowFocused = true,
 	IsDevConsoleOpen = false
 }
 
@@ -88,10 +97,9 @@ EffectsManager.ClassName = "EffectsManager"
 EffectsManager.RunContext = "Client"
 
 function EffectsManager._ready()
-	local function handleFocusChange(isFocused)
-		Player_Values.IsMenuOpened = isFocused
+	local function handleFocusChange()
 		local animationAlias
-		if isFocused then
+		if (not Player_Values.IsMenuOpened) and Player_Values.IsWindowFocused then
 			animationAlias = "FocusGainedGreyBlur"
 		else
 			animationAlias = "FocusReleasedGreyBlur"
@@ -102,19 +110,23 @@ function EffectsManager._ready()
 	handleFocusChange((GuiService.MenuIsOpen ~= true))
 
 	GuiService.MenuOpened:Connect(function()
-		handleFocusChange(false)
+		Player_Values.IsMenuOpened = true
+		handleFocusChange()
 	end)
 
 	GuiService.MenuClosed:Connect(function()
-		handleFocusChange(true)
+		Player_Values.IsMenuOpened = false
+		handleFocusChange()
 	end)
 
 	UserInputService.WindowFocused:Connect(function()
-		handleFocusChange(true)
+		Player_Values.IsWindowFocused = true
+		handleFocusChange()
 	end)
 
 	UserInputService.WindowFocusReleased:Connect(function()
-		handleFocusChange(false)
+		Player_Values.IsWindowFocused = false
+		handleFocusChange()
 	end)
 end
 

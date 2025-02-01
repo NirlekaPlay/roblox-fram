@@ -32,7 +32,11 @@ function ChapterText.BeginShowChapter(number: number, title: string, durationSta
 	current_title = title
 	for _, text: TextLabel in ipairs(array_chapters_text) do
 		if text.Parent.Name:find("Num") then
-			text.Text = "CHAPTER "..tostring(number)
+			if type(number) == "number" then
+				text.Text = "CHAPTER "..tostring(number)
+			else
+				text.Text = tostring(number)
+			end
 		else
 			text.Text = title
 		end

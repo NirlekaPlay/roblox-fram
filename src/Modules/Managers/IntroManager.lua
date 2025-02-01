@@ -8,6 +8,7 @@ local cursor = require("CursorManager")
 local effectsMan = require("EffectsManager")
 local ssp2d = require("SoundStreamPlayer2D")
 local hsd = require("HeadShakeDetector")
+local basementManager = require("BasementManager")
 local maid = require("Maid").new()
 
 local ambience = ssp2d.new(game.SoundService.Ambience.NoiseAmbience)
@@ -36,14 +37,14 @@ end
 function t.BeginFirstSequence()
 	dia.PlaySequence([[
 		\n5 ...
-		\n1 Oh!| Hello there!
+		\n1 @1 Oh!| Hello there!
 		\n1.13 Uhm.. can you move?
 		\n1 Or.. I dont't know..
-		@1.5 look around?]]
+		@1 look around?]]
 	)
 	dia.PlaySequence([[
 		\n2 Oh...
-		\n2 @1 Hang on let me fix that..
+		\n.5 @1 Hang on let me fix that..
 	]])
 	chap.BeginShowChapter(1, "Unwanted Guest", 5)
 	cursor.SetCursor(true, true)
@@ -56,13 +57,13 @@ function t.BeginFirstSequence()
 	dia.PlaySequence([[
 		\n6 Yeah you can't really see anything...
 		\n1.2 You can't even stand up or walk..
-		\n2.3 But I have so much to show to you..
+		\n1.3 But I have so much to show to you..
 		\n1.3 @1 Administrator.
 	]])
 	dia.PlaySequence([[
 		\n3 Alright...
 		\n1 Heres the deal.
-		\n1 You're gonn wait here|
+		\n1 You're gonna wait here|
 		\n1.5 And wait for me to fix things..
 		\n1.3 So you can stand up and walk.
 		\n1.3 And whatever you do...
@@ -97,17 +98,26 @@ function t.BeginFirstSequence()
 			\n.1 Wha-
 			\n.5 Did you just shaked your head?!
 			\n1 No?!
-			\n1.5 Yeah. You're not a very fitting subject.
+			\n1 Yeah. You're not a very fitting subject.
 			\n1 Aren't you?
 			\n2 Just to keep things safe..
 			\n1.5 @1 I will send you back to the shadow realm.
 		]])
+		ambience:Stop()
 		lightShutOff:Play()
 		effectsMan.PlayAnimationAlias("LightShutOff")
 		task.wait(1)
 		dia.ShowText_ForDuration("Cya!", 1)
-		chap.BeginShowChapter(2, "COMING SOON...", 5)
+		basementManager.BeginFirstSequence()
+		t.Cleanup()
 	end))
+end
+
+function t.Cleanup()
+	ambience:Destroy()
+	lightShutOff:Destroy()
+	speaker_music_relax:Destroy()
+	doorButton:Destroy()
 end
 
 return t
