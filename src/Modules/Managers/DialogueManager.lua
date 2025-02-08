@@ -187,8 +187,6 @@ function DialogueManager.TickText()
 	local segments = processFormatting(current_text)
 	local displayedText = ""
 
-	print(segments)
-
 	for _, segment in ipairs(segments) do
 		if not looping then break end
 

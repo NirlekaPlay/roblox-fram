@@ -2,28 +2,67 @@
 -- NirlekaDev
 -- January 18, 2024
 
+--[=[
+	@class Dasar
+
+	A module management system that handles module initialization, dependency management,
+	and lifecycle events.
+
+	@interface ModuleStructure
+	.new() -> Instance? -- Constructors are ignored.
+	._ready() -> nil    -- Called when module is initialized
+	._run() -> nil      -- Called each frame after initialization
+]=]
+
 local RunService = game:GetService("RunService")
 local Provider = require(game.ReplicatedStorage.Modules._index.Service.Provider)
 
-local acquired_modules = {}
-local required_modules = {}
-local run_service_modules = {}
-
 local dasar_string_header = ":: Dasar :: "
-local dasar_is_started = false
-local dasar_is_starting = false
-
+local loadedPaths = {}
+local moduleCache = {}
+local runServiceConnection: RBXScriptConnection
+local DasarState = {
+	isStarted = false,
+	isStarting = false,
+	requiredModules = {},
+	requiredModulesIndex = 0,
+	requiredModulesMaxIndex = 0,
+	runServiceModules = {}
+}
 local moduleLocations = {
 	game.ReplicatedStorage.Modules._index
 }
-local moduleTypesLocations = {
-	["Classes"] = moduleLocations["Class"],
-	["Library"] = moduleLocations["Library"],
-	["Managers"] = moduleLocations["Managers"],
-	["Service"] = moduleLocations["Service"],
-}
+local moduleTypesLocations
 
-local function initializeModule(module, moduleName)
+local function findModule(moduleName)
+	if moduleCache[moduleName] then
+		return moduleCache[moduleName]
+	end
+	for _, location in ipairs(moduleLocations) do
+		for _, module in pairs(location:GetDescendants()) do
+			if module:IsA("ModuleScript") and module.Name == moduleName then
+				moduleCache[moduleName] = module
+				return module
+			end
+		end
+	end
+	return nil
+end
+
+local function callRunFunctions()
+	for _, func in pairs(DasarState.runServiceModules) do
+		task.spawn(func)
+	end
+end
+
+local function initializeModule(module, moduleInstance, recursive)
+	local modulePath = moduleInstance:GetFullName()
+	if loadedPaths[modulePath] then
+		warn(dasar_string_header .. "Circular dependency detected: " .. modulePath)
+		return
+	end
+	loadedPaths[modulePath] = true
+
 	local moduleConstructor = module["new"]
 	local moduleRun = module["_run"]
 	local moduleReady = module["_ready"]
@@ -33,7 +72,7 @@ local function initializeModule(module, moduleName)
 	end
 
 	if moduleRun and type(moduleRun) == "function" then
-		table.insert(run_service_modules, moduleRun)
+		table.insert(DasarState.runServiceModules, moduleRun)
 	end
 
 	if moduleReady and type(moduleReady) == "function" then
@@ -42,42 +81,43 @@ local function initializeModule(module, moduleName)
 			if not success then
 				warn(dasar_string_header .. "Module initialization error: " .. tostring(err))
 			else
-				warn(string.format(dasar_string_header .. "Initialized module  '%s'", moduleName))
+				warn(string.format(dasar_string_header .. "Initialized module  '%s'", moduleInstance.Name))
+			end
+
+			if recursive then
+				recursive(module, moduleInstance)
 			end
 		end)
 	end
-end
 
-local function findModule(moduleName)
-	for _, location in ipairs(moduleLocations) do
-		for _, module in pairs(location:GetDescendants()) do
-			if module:IsA("ModuleScript") and module.Name == moduleName then
-				return module
-			end
-		end
-	end
-	return nil
+	loadedPaths[modulePath] = nil
 end
 
 local function requireModule(moduleInstance)
+	if #moduleLocations == 0 then
+		error(dasar_string_header .. "No module locations configured")
+	end
 	local attemptRequire
 	task.spawn(function()
 		local moduleName = moduleInstance.Name
+		local modulePath = moduleInstance:GetFullName()
 		local success, errorMsg = pcall(function()
 			attemptRequire = require(moduleInstance)
 		end)
 
 		if not success then
-			error(string.format(dasar_string_header.."Attempt to require('%s') error: \n %s \n",
-			moduleName,
-			errorMsg,
-			debug.traceback()
-			))
+			warn(string.format(
+				"%sModule '%s' failed to load:\nPath: %s\nError: %s\nStack: %s",
+				dasar_string_header,
+				moduleInstance.Name,
+				modulePath,
+				errorMsg,
+				debug.traceback()
+				))
 			return
-		else
-			required_modules[moduleName] = attemptRequire
-			initializeModule(attemptRequire, moduleName)
 		end
+
+		DasarState.requiredModules[moduleName] = attemptRequire
 	end)
 
 	return attemptRequire
@@ -110,16 +150,95 @@ function Dasar.Require(moduleName: string)
 end
 
 --[=[
+	Requires a module and catches any errors during the require.
+	Then runs any functions such as _ready() or _run().
+	Classes or OOP objects with a new() function will be ignored.
+
+	```lua
+	local Bar = require(path.to.bar)
+	Dasar.PreloadModule(bar)
+	```
+]=]
+function Dasar.PreloadModule(modelInstance: ModuleScript, recursive: any?)
+	assert(typeof(modelInstance) == "Instance" and modelInstance:IsA("ModuleScript"), string.format(dasar_string_header.."'moduleInstance' parameter must be an Instance. Got %s", typeof(modelInstance)))
+
+	local attemptRequire = requireModule(modelInstance)
+	if not attemptRequire then
+		return
+	end
+
+	local function initRecursive(module, moduleInstance)
+		if DasarState.requiredModulesIndex == DasarState.requiredModulesMaxIndex then
+			warn(dasar_string_header .. "Initialization finnished.")
+		end
+		local module_children = moduleInstance:GetChildren()
+		if #module_children <= 0 then
+			return
+		end
+
+		for _, child_module in ipairs(module_children) do
+			if not child_module:IsA("ModuleScript") then
+				continue
+			end
+
+			Dasar.PreloadModule(child_module, initRecursive)
+		end
+	end
+
+	recursive = recursive or initRecursive
+
+	initializeModule(attemptRequire, modelInstance, recursive)
+end
+
+--[=[
 	Initializes all modules.
 	Meaning all modules are required, if a module has a _run or _ready functions
 	will be called.
+
+	```lua
+	local Dasar = require(game:GetService("ReplicatedStorage").Modules.Dasar)
+	Dasar.Start()
+	```
 ]=]
 function Dasar.Start()
-	if dasar_is_started or dasar_is_starting then return end
-	dasar_is_starting = true
+	if DasarState.isStarted or DasarState.isStarting then return end
+	DasarState.isStarting = true
+	local start_time = tick()
+	warn(dasar_string_header .. "Initializing Dasar. . .")
 
-	dasar_is_starting = false
-	dasar_is_started = true
+	Provider.AwaitAllAssetsAsync()
+
+	moduleTypesLocations = {
+		Managers = moduleLocations[1]["Managers"],
+		Service = moduleLocations[1]["Service"]
+	}
+
+	print(moduleTypesLocations)
+
+	for _, location: Folder in pairs(moduleTypesLocations) do
+		for _, child in ipairs(location:GetChildren()) do
+			if not child:IsA("ModuleScript") then
+				continue
+			end
+
+			Dasar.PreloadModule(child)
+		end
+
+		for _, child in ipairs(location:GetDescendants()) do
+			if child:IsA("ModuleScript") then
+				continue
+			end
+
+			DasarState.requiredModulesMaxIndex += 1
+		end
+	end
+
+	RunService.Heartbeat:Connect(function(dt)
+		callRunFunctions(dt)
+	end)
+
+	DasarState.isStarting = false
+	DasarState.isStarted = true
 end
 
 return Dasar
