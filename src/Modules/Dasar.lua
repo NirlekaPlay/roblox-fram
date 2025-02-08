@@ -21,6 +21,7 @@ local dasar_string_header = ":: Dasar :: "
 local loadedPaths = {}
 local moduleCache = {}
 local runServiceConnection: RBXScriptConnection
+local start_time
 local DasarState = {
 	isStarted = false,
 	isStarting = false,
@@ -117,6 +118,7 @@ local function requireModule(moduleInstance)
 			return
 		end
 
+		DasarState.requiredModulesIndex += 1
 		DasarState.requiredModules[moduleName] = attemptRequire
 	end)
 
@@ -169,7 +171,7 @@ function Dasar.PreloadModule(modelInstance: ModuleScript, recursive: any?)
 
 	local function initRecursive(module, moduleInstance)
 		if DasarState.requiredModulesIndex == DasarState.requiredModulesMaxIndex then
-			warn(dasar_string_header .. "Initialization finnished.")
+			warn(string.format(dasar_string_header .. "Initialization finnished. Time: %s", tick() - start_time))
 		end
 		local module_children = moduleInstance:GetChildren()
 		if #module_children <= 0 then
@@ -203,7 +205,7 @@ end
 function Dasar.Start()
 	if DasarState.isStarted or DasarState.isStarting then return end
 	DasarState.isStarting = true
-	local start_time = tick()
+	start_time = tick()
 	warn(dasar_string_header .. "Initializing Dasar. . .")
 
 	Provider.AwaitAllAssetsAsync()
@@ -213,9 +215,15 @@ function Dasar.Start()
 		Service = moduleLocations[1]["Service"]
 	}
 
-	print(moduleTypesLocations)
-
 	for _, location: Folder in pairs(moduleTypesLocations) do
+		for _, child in ipairs(location:GetDescendants()) do
+			if not child:IsA("ModuleScript") then
+				continue
+			end
+
+			DasarState.requiredModulesMaxIndex += 1
+		end
+
 		for _, child in ipairs(location:GetChildren()) do
 			if not child:IsA("ModuleScript") then
 				continue
@@ -223,17 +231,9 @@ function Dasar.Start()
 
 			Dasar.PreloadModule(child)
 		end
-
-		for _, child in ipairs(location:GetDescendants()) do
-			if child:IsA("ModuleScript") then
-				continue
-			end
-
-			DasarState.requiredModulesMaxIndex += 1
-		end
 	end
 
-	RunService.Heartbeat:Connect(function(dt)
+	runServiceConnection = RunService.Heartbeat:Connect(function(dt)
 		callRunFunctions(dt)
 	end)
 

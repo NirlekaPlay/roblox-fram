@@ -31,7 +31,7 @@ function t._ready()
 	ambience:Play()
 	doorButton = buttonClass.new(workspace.Scenes:WaitForChild("Baseplate").WorldRoot.Door.Door)
 	doorButton.isActive = false
-	t.BeginFirstSequence()
+	task.spawn(t.BeginFirstSequence)
 end
 
 function t.BeginFirstSequence()
@@ -39,12 +39,12 @@ function t.BeginFirstSequence()
 		\n5 ...
 		\n1 @1 Oh!| Hello there!
 		\n1.13 Uhm.. can you move?
-		\n1 Or.. I dont't know..
+		\n1 Or.. I don't know..
 		@1 look around?]]
 	)
 	dia.PlaySequence([[
 		\n2 Oh...
-		\n.5 @1 Hang on let me fix that..
+		\n.5 @1 Hang on, let me fix that..
 	]])
 	chap.BeginShowChapter(1, "Unwanted Guest", 5)
 	cursor.SetCursor(true, true)
@@ -62,10 +62,10 @@ function t.BeginFirstSequence()
 	]])
 	dia.PlaySequence([[
 		\n3 Alright...
-		\n1 Heres the deal.
+		\n1 Here's the deal.
 		\n1 You're gonna wait here|
-		\n1.5 And wait for me to fix things..
-		\n1.3 So you can stand up and walk.
+		\n1.5 and wait for me to fix things..
+		\n1.3 So that you can stand up and walk.
 		\n1.3 And whatever you do...
 		\n1 _DO_ | _NOT_ | _OPEN_ | _THE_ | _DOOR._ |
 		\n1.5 Got it?
@@ -79,7 +79,7 @@ function t.BeginFirstSequence()
 		hsd.SetDetection(false)
 		dia.PlaySequence([[
 			\n.3 ...
-			\n2 Did you actually just nodded to me?
+			\n2 Did you actually just nod at me?
 			\n1 Is that a yes?
 			\n1.3 ...
 			\n1.3 Alright then.| Deal!
@@ -96,12 +96,12 @@ function t.BeginFirstSequence()
 		hsd.SetDetection(false)
 		dia.PlaySequence([[
 			\n.1 Wha-
-			\n.5 Did you just shaked your head?!
+			\n.5 Did you just shake your head?!
 			\n1 No?!
 			\n1 Yeah. You're not a very fitting subject.
-			\n1 Aren't you?
+			\n1 Are you?
 			\n2 Just to keep things safe..
-			\n1.5 @1 I will send you back to the shadow realm.
+			\n1.5 @1 I'll send you back to the shadow realm.
 		]])
 		ambience:Stop()
 		lightShutOff:Play()
