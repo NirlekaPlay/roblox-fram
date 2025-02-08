@@ -80,7 +80,7 @@ local function initializeModule(module, moduleInstance, recursive)
 		task.spawn(function()
 			local success, err = pcall(moduleReady)
 			if not success then
-				warn(dasar_string_header .. "Module initialization error: " .. tostring(err))
+				warn(string.format(dasar_string_header.. "Module initialization error: \n%s\n\n%s", err, debug.traceback()))
 			else
 				warn(string.format(dasar_string_header .. "Initialized module  '%s'", moduleInstance.Name))
 			end

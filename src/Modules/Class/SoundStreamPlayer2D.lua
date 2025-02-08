@@ -4,23 +4,16 @@
 
 --[[
 	A kind of port from Godot's AudioStreamPlayer, both 2D and 3D.
+
+	Constructor looks like a mess?
+	Well blame whoever thought that not adding metamethod for detecting table changes was a good idea.
 ]]
 
 local ContentProvider = game:GetService("ContentProvider")
 local SoundService = game:GetService("SoundService")
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
 local Maid = require("Maid")
-
-export type SoundPlayer2D = {
-	autoplay: boolean,
-	deffered_playing: boolean,
-	sound: Sound,
-	soundGroup: SoundGroup,
-	pitch_scale: number,
-	playing: boolean,
-	play_paused: boolean,
-	volume_db: number
-}
+local Inst = require("inst")
 
 local function strictTypeSet(self, i, v)
 	local currentValue = self[i]
@@ -39,6 +32,36 @@ local function strictTypeSet(self, i, v)
 	rawset(self, i, v)
 end
 
+local function setSoundInstance(sound)
+	assert(typeof(sound) == ("Instance" or "string"),
+		"sound must be either of type string or Instance. Got %s \n\n %s",
+		typeof(sound),
+		debug.traceback()
+	)
+
+	if type(sound) == "string" then
+		return Inst.create("Sound", nil, game.SoundService, {SoundId = sound})
+	else
+		return sound
+	end
+end
+
+local function setSoundGroup(sound)
+	assert(typeof(sound) == ("Instance" or "string"),
+		"sound must be either of type string or Instance. Got %s \n\n %s",
+		typeof(sound),
+		debug.traceback()
+	)
+
+	if not sound.SoundGroup then
+		sound.SoundGroup = SoundService.World
+		sound.Parent = SoundService.World
+		return SoundService.World
+	else
+		return sound.SoundGroup
+	end
+end
+
 local SoundPlayer = {}
 SoundPlayer.__index = SoundPlayer
 
@@ -53,79 +76,63 @@ SoundPlayer.__index = SoundPlayer
 	@param properties {[string]:any}
 	@return SoundStreamPlayer2D
 ]=]
-function SoundPlayer.new(sound: string | Sound, properties: {[string]:any}?)
-	local self = setmetatable({}, SoundPlayer)
+function SoundPlayer.new(sound: string | Sound, properties: {[string]: any}?)
+	local data = {
+		autoplay = false,
+		deffered_playing = false,
+		sound = setSoundInstance(sound),
+		sound_group = setSoundGroup(sound),
+		pitch_scale = 0,
+		playing = false,
+		play_paused = false,
+		volume_db = 1,
+		last_time_pos = 0,
+		_pitch_sfx = Inst.create("PitchShiftSoundEffect", nil, nil, {Octave = 0}),
+		_maid = Maid.new()
+	}
 
-	self.autoplay = false
-	self.deffered_playing = false
-	self.sound = nil
-	self.sound_group = nil
-	self.pitch_scale = 0
-	self.playing = false
-	self.play_paused = false
-	self.volume_db = 1
-	self.last_time_pos = 0
+	local self = {}
 
-	self._pitch_sfx = nil
-	self._maid = Maid.new()
+	local mt = {
+		__index = function(t, k)
+			return SoundPlayer[k] or data[k]
+		end,
 
-	if typeof(sound) == "Instance" then
-		if not sound:IsA("Sound") then
-			return
+		__newindex = function(t, k, v)
+			--strictTypeSet(t, k, v)
+			if data[k] ~= v then
+				rawset(data, k, v)
+
+				if k == "playing" or k == "play_paused" then
+					if v then
+						t:Play(t.last_time_pos)
+					else
+						rawset(data, "play_paused", true)
+						if data.playing then
+							t:Stop()
+						end
+					end
+				elseif k == "pitch_scale" then
+					data._pitch_sfx.Octave = v
+				end
+			end
 		end
+	}
 
-		self.sound = sound
-		if not sound.SoundGroup then
-			sound.SoundGroup = SoundService.World
-			self.sound_group = SoundService.World
-		else
-			self.sound_group = sound.SoundGroup
-		end
-	elseif type(sound) == "string" then
-		self.sound = Instance.new("Sound")
-		self.sound.SoundId = sound
-		self.sound_group = SoundService.Isolated
-		self.sound.Parent = SoundService.Isolated
+	setmetatable(self, mt)
 
-		self._pitch_sfx = Instance.new("PitchShiftSoundEffect")
-		self._pitch_sfx.Octave = self.pitch_scale
-		self._pitch_sfx.Parent = self.sound
-	end
-
-	if properties then
-		for i, v in pairs(properties) do
-			strictTypeSet(self, i, v)
-		end
-	end
-
-	self._maid:GiveTask(self.sound)
-	self._maid:GiveTask(self._pitch_sfx)
-	self._maid:GiveTask(sound.Stopped:Connect(function()
-		self.playing = false
+	data._pitch_sfx.Parent = data.sound
+	data._maid:GiveTask(data.sound)
+	data._maid:GiveTask(data._pitch_sfx)
+	data._maid:GiveTask(data.sound.Stopped:Connect(function()
+		rawset(data, "playing", false)  -- Prevent recursion here too
 	end))
 
 	if self.autoplay then
 		self:Play()
 	end
 
-	self.__newindex = function(_, i, v)
-		strictTypeSet(self, i, v)
-		if i == ("playing" or "play_paused") then
-			if i then
-				self:Play(self.last_time_pos)
-			else
-				self.play_paused = true
-				if self.playing then
-					self:Stop()
-				end
-			end
-			return
-		elseif i == "pitch_scale" then
-			self._pitch_sfx.Octave = v
-		end
-	end
-
-	return self :: SoundPlayer2D
+	return self
 end
 
 --[=[

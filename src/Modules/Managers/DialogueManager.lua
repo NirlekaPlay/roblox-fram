@@ -12,6 +12,7 @@ local SoundService = game:GetService("SoundService")
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
 
 local ssp2d = require("SoundStreamPlayer2D")
+local randf_range = require("math").randf_range
 
 local ui = game.Players.LocalPlayer.PlayerGui:WaitForChild("Dialogue").root
 local speaker_click = ssp2d.new(SoundService.Isolated.dialogue)
@@ -27,6 +28,11 @@ local BASE_DELAYS = {
 	[","] = 0.2,
 	["|"] = 1.0
 }
+
+local function playSound()
+	speaker_click.pitch_scale = randf_range(0.2, 0.6)
+	speaker_click:Play()
+end
 
 local function processFormatting(text)
 	local segments = {}
@@ -193,8 +199,7 @@ function DialogueManager.TickText()
 		if segment.skip then
 			displayedText = displayedText .. segment.text
 			dialogueUI.Text = displayedText
-			speaker_click.pitch_scale = math.random(0.2, 0.6)
-			speaker_click:Play()
+			playSound()
 			continue
 		end
 
@@ -224,8 +229,7 @@ function DialogueManager.TickText()
 				dialogueUI.Text = displayedText
 
 				if not char:match("[%p%s]") then
-					speaker_click.pitch_scale = math.random(0.2, 0.6)
-					speaker_click:Play()
+					playSound()
 				end
 
 				i = i + 1

@@ -6,6 +6,8 @@
 	More advanced and some simple math functions.
 ]]
 
+local random = Random.new(tick())
+
 local lib = {}
 
 function lib.ease(p_x, p_c)
@@ -43,16 +45,17 @@ function lib.isOdd(n)
 	return not (n % 2 == 0)
 end
 
-function lib.GetAllFunctions()
-	local functions = {}
+function lib.Randomize(seed)
+	seed = seed or tick()
+	random = Random.new(seed)
+end
 
-	for _, func in ipairs(lib) do
-		if type(func) == "function" then
-			table.insert(functions, func)
-		end
-	end
+function lib.randf()
+	return random:NextNumber(0, 1)
+end
 
-	return table.unpack(functions)
+function lib.randf_range(min, max)
+	return random:NextNumber(min, max)
 end
 
 return lib
