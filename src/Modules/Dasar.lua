@@ -50,9 +50,9 @@ local function findModule(moduleName)
 	return nil
 end
 
-local function callRunFunctions()
+local function callRunFunctions(dt)
 	for _, func in pairs(DasarState.runServiceModules) do
-		task.spawn(func)
+		task.spawn(func, dt)
 	end
 end
 
