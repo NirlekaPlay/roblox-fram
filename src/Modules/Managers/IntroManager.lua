@@ -9,17 +9,26 @@ local effectsMan = require("EffectsManager")
 local ssp2d = require("SoundStreamPlayer2D")
 local hsd = require("HeadShakeDetector")
 local basementManager = require("BasementManager")
-local maid = require("Maid").new()
+local maid = require("Maid")
+local maid_main = maid.new()
 
-local ambience = ssp2d.new(game.SoundService.Ambience.NoiseAmbience)
-local lightShutOff = ssp2d.new(game.SoundService.Isolated.light_shut)
-local speaker_music_relax = ssp2d.new(game.SoundService.Music.music_relax)
-ambience.sound.Looped = true
+local speakers = {
+	ambience = ssp2d.new(game.SoundService.Ambience.NoiseAmbience),
+	lightShutOff = ssp2d.new(game.SoundService.Isolated.light_shut),
+	music_relax = ssp2d.new(game.SoundService.Music.music_relax)
+}
 
-local doorButton
+local world_objects = {
+	button_door = nil
+}
+
 local t = {}
 
 function t._ready()
+	maid_main.GiveTasksArray({
+		speakers,
+		world_objects
+	})
 	if not sceneMan:IsManagerReady() then
 		sceneMan.Ready:Wait()
 	end
@@ -28,9 +37,9 @@ function t._ready()
 	end
 	task.wait(.3)
 	cam.SetSocket("sky")
-	ambience:Play()
-	doorButton = buttonClass.new(workspace.Scenes:WaitForChild("Baseplate").WorldRoot.Door.Door)
-	doorButton.isActive = false
+	speakers.ambience:Play()
+	world_objects.door_button = buttonClass.new(workspace.Scenes:WaitForChild("Baseplate").WorldRoot.Door.Door)
+	world_objects.door_button.isActive = false
 	task.spawn(t.BeginFirstSequence)
 end
 
@@ -73,9 +82,10 @@ function t.BeginFirstSequence()
 		\n1 I'm being serious.
 		\n1 Nod if you understood me.
 	]])
+	local maid_detection = maid.new()
 	hsd.SetDetection(true)
-	maid:GiveTask(hsd.OnNod:Connect(function()
-		maid:DoCleaning()
+	maid_detection:GiveTask(hsd.OnNod:Connect(function()
+		maid_detection:DoCleaning()
 		hsd.SetDetection(false)
 		dia.PlaySequence([[
 			\n.3 ...
@@ -87,12 +97,12 @@ function t.BeginFirstSequence()
 			\n1 @1 (Man.. I actually like this one..)
 		]])
 		effectsMan.PlayAnimationAlias("FadeOut")
-		ambience:Stop()
-		speaker_music_relax:Play()
+		speakers.ambience:Stop()
+		speakers.music_relax:Play()
 		chap.BeginShowChapter(2, "COMING SOON...", 5)
 	end))
-	maid:GiveTask(hsd.OnShake:Connect(function()
-		maid:DoCleaning()
+	maid_detection:GiveTask(hsd.OnShake:Connect(function()
+		maid_detection:DoCleaning()
 		hsd.SetDetection(false)
 		dia.PlaySequence([[
 			\n.1 Wha-
@@ -103,8 +113,8 @@ function t.BeginFirstSequence()
 			\n2 Just to keep things safe..
 			\n1.5 @1 I'll send you back to the shadow realm.
 		]])
-		ambience:Stop()
-		lightShutOff:Play()
+		speakers.ambience:Stop()
+		speakers.lightShutOff:Play()
 		effectsMan.PlayAnimationAlias("LightShutOff")
 		task.wait(1)
 		dia.ShowText_ForDuration("Cya!", 1)
@@ -114,10 +124,7 @@ function t.BeginFirstSequence()
 end
 
 function t.Cleanup()
-	ambience:Destroy()
-	lightShutOff:Destroy()
-	speaker_music_relax:Destroy()
-	doorButton:Destroy()
+	maid_main:DoCleaning()
 end
 
 return t

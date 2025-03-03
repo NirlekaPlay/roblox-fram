@@ -9,6 +9,7 @@
 				CLIENT ONLY.
 ]]
 
+local UserInputService = game:GetService("UserInputService")
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
 
 local CameraSocket = require("CameraSocket")
@@ -16,13 +17,15 @@ local MathLib = require("math")
 local SceneManager = require("SceneManager")
 local SmoothValue = require("SmoothValue")
 
+local ease = MathLib.ease
+local lerp = MathLib.lerp
+
 local camera = workspace.CurrentCamera or workspace.Camera
 local currentCframe: CFrame
 local currentFov : number
 local currentSocket : string
 local dur = 1.5
 local elapsed = 0
-local mouse = game.Players.LocalPlayer:GetMouse()
 local moving = false
 local socketArray
 local speaker_pan
@@ -33,8 +36,9 @@ local smoothTime = 1
 local smoothTiltX = SmoothValue.new(Vector3.new(0, 0, 0), smoothTime)
 local smoothTiltY = SmoothValue.new(Vector3.new(0, 0, 0), smoothTime)
 
-local ease = MathLib.ease
-local lerp = MathLib.lerp
+local viewSize = camera.ViewportSize
+local viewSizeX = viewSize.X
+local viewSizeY = viewSize.Y
 
 local CameraManager = {}
 CameraManager.ClassName = "CameraManager"
@@ -52,7 +56,6 @@ end
 
 function CameraManager._run(dt)
 	CameraManager.LerpMovement(dt)
-	CameraManager.TiltCameraToMouse()
 end
 
 function CameraManager.SetTiltCamera(value: boolean)
@@ -109,8 +112,9 @@ end
 
 function CameraManager.TiltCameraToMouse()
 	if tiltMouse then
-		local goalTiltX = (((mouse.Y - mouse.ViewSizeY / 2) / mouse.ViewSizeY) * -maxTilt)
-		local goalTiltY = (((mouse.X - mouse.ViewSizeX / 2) / mouse.ViewSizeX) * -maxTilt)
+		local mouseLocation = UserInputService:GetMouseLocation()
+		local goalTiltX = (((mouseLocation.Y - viewSizeY / 2) / viewSizeY) * -maxTilt)
+		local goalTiltY = (((mouseLocation.X - viewSizeX / 2) / viewSizeX) * -maxTilt)
 
 		local smoothX = smoothTiltX:Update(Vector3.new(math.rad(goalTiltX), 0, 0))
 		local smoothY = smoothTiltY:Update(Vector3.new(0, math.rad(goalTiltY), 0))

@@ -14,10 +14,11 @@ local ssp2d = require("SoundStreamPlayer2D")
 
 local images = game.ReplicatedStorage.Images
 local speaker_mouseShow = ssp2d.new(game.SoundService.Isolated.swipe)
-local cursor_point : ImageLabel = images.mouse_point
-local cursor_hover : ImageLabel = images.mouse_hover
-local cursor_invalid : ImageLabel = images.mouse_invalid
-local cursor_icons = {cursor_point, cursor_hover, cursor_invalid}
+local cursor_icons = {
+	point = images.mouse_point,
+	hover = images.mouse_hover,
+	invalid = images.mouse_invalid
+}
 local cursor_visible = false
 local cursor_lock_center = true
 
@@ -51,12 +52,11 @@ function CursorManager.SetCursorLock(booelan)
 end
 
 function CursorManager.SetCursorImage(alias: string)
-	for _, icon in pairs(cursor_icons) do
-		if string.find(icon.Name, alias) then
-			UserInputService.MouseIcon = icon.Texture
-			return
-		end
+	local icon = cursor_icons[alias]
+	if not icon then
+		return
 	end
+	UserInputService.MouseIcon = icon.Texture
 end
 
 return CursorManager

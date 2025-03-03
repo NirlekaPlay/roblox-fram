@@ -1,4 +1,7 @@
 --[=[
+
+	MODIFIED BY NIRLEKADEV
+
 	Manages the cleaning of events and other things. Useful for
 	encapsulating state and make deconstructors easy.
 
@@ -179,6 +182,20 @@ function Maid:GiveTask(task)
 	end
 
 	return taskId
+end
+
+function Maid:GiveTasksArray(tasks)
+	for _, task in pairs(tasks) do
+		if type(task) == "table" then
+			if task.Destroy then
+				Maid:GiveTask(task)
+			else
+				Maid:GiveTasksArray(task)
+			end
+		end
+
+		Maid:GiveTask(task)
+	end
 end
 
 --[=[
