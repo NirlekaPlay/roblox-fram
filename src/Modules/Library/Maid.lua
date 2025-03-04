@@ -188,13 +188,14 @@ function Maid:GiveTasksArray(tasks)
 	for _, task in pairs(tasks) do
 		if type(task) == "table" then
 			if task.Destroy then
-				Maid:GiveTask(task)
+				self:GiveTask(task)
 			else
-				Maid:GiveTasksArray(task)
+				self:GiveTasksArray(task)
 			end
+			continue
 		end
 
-		Maid:GiveTask(task)
+		self:GiveTask(task)
 	end
 end
 

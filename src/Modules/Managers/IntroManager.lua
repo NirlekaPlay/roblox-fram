@@ -25,7 +25,7 @@ local world_objects = {
 local t = {}
 
 function t._ready()
-	maid_main.GiveTasksArray({
+	maid_main:GiveTasksArray({
 		speakers,
 		world_objects
 	})
