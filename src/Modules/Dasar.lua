@@ -71,7 +71,7 @@ end
 local function err_instance(value, value_name, e_class)
 	err_type(value, value_name, "Instance")
 
-	if e_class:IsA(e_class) then
+	if value:IsA(e_class) then
 		return true
 	end
 
@@ -264,7 +264,7 @@ function Dasar.PreloadModule(moduleInstance: ModuleScript, recursive: any?)
 	if moduleReady and type(moduleReady) == "function" then
 		task.spawn(function()
 			local success, errorMsg, traceback = pcall_traceback(function()
-				attemptRequire = require(moduleInstance)
+				moduleReady()
 			end)
 
 			if not success then
