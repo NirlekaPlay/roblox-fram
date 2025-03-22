@@ -96,7 +96,7 @@ function Dictionary:recursive_hash(recursion_count)
 	recursion_count = recursion_count + 1
 
 	-- Iterate over each key-value pair in the dictionary
-	for _, kv in ipairs(self._data) do
+	for _, kv in pairs(self._data) do
 		-- It is assumed that kv.key and kv.value are objects that implement a recursive_hash(recursion_count) method.
 		h = hash_murmur3_one_32(kv.key:recursive_hash(recursion_count), h)
 		h = hash_murmur3_one_32(kv.value:recursive_hash(recursion_count), h)
@@ -145,10 +145,8 @@ function Dictionary:Duplicate(deep: boolean, copies)
 	return dict_copy
 end
 
-function Dictionary:Remove(key: any)
-	table.remove(self._data, key)
-
-	return self._data[key] ~= nil
+function Dictionary:Erase(key: any)
+	self._data[key] = nil
 end
 
 function Dictionary:FindKey(value: any)
@@ -181,14 +179,12 @@ function Dictionary:Has(key: any)
 end
 
 function Dictionary:HasAll(keys: {})
-	function Dictionary:HasAll(keys: {})
-		for _, key in ipairs(keys) do
-			if self._data[key] == nil then
-				return false
-			end
+	for key, _ in ipairs(keys) do
+		if self._data[key] == nil then
+			return false
 		end
-		return true
 	end
+	return true
 end
 
 function Dictionary:Hash()
