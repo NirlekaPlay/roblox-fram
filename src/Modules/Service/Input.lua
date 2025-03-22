@@ -19,6 +19,7 @@ local InputMap = require("InputMap")
 local Maid = require("Maid")
 local Signal = require("Signal")
 
+local actions_signals = Array.new()
 local keys_pressed = Array.new()
 local inputs_pressed_events = Array.new()
 local inputs_changed_events = Array.new()
@@ -98,14 +99,74 @@ local function newInputSignal(input, array)
 		array[input] = signal
 		return signal
 	end
+
+	return event
+end
+
+local function newActionSignal(actionName, inputState)
+	if not InputMap:HasAction(actionName) then
+		return
+	end
+
+	actions_signals[actionName] = actions_signals[actionName] or {}
+	local action_signal = actions_signals[actionName]
+
+	if not action_signal[inputState] then
+		action_signal[inputState] = Signal.new()
+	end
+
+	return action_signal[inputState]
+end
+
+local function simulateAction(actionName, inputState, pressed)
+	if disabled_input then
+		return
+	end
+
+	local action = InputMap.GetAction(actionName)
+	if not action then
+		return
+	end
+
+	action.api_called = true
+	action.pressed = pressed
+
+	local action_signal = actions_signals[actionName]
+	if not action_signal then
+		return
+	end
+	if not action_signal[inputState] then
+		return
+	end
+
+	action_signal[inputState]:Fire()
+end
+
+local function getInputArray(inputType)
+	if inputType == Enum.UserInputState.Begin then
+		return inputs_pressed_events
+	elseif inputType == Enum.UserInputState.Change then
+		return inputs_changed_events
+	elseif inputType == Enum.UserInputState.End then
+		return inputs_released_events
+	end
+	return nil
 end
 
 local Input = {}
 
 function Input._ready()
-	UserInputService.InputBegan:Connect(Input._parse_input_began)
-	UserInputService.InputChanged:Connect(Input._parse_input_began)
-	UserInputService.InputEnded:Connect(Input._parse_input_began)
+	UserInputService.InputBegan:Connect(function(inputObject, gameProcessedEvent)
+		Input._parse_input(inputObject, gameProcessedEvent, Enum.UserInputState.Begin)
+	end)
+
+	UserInputService.InputChanged:Connect(function(inputObject, gameProcessedEvent)
+		Input._parse_input(inputObject, gameProcessedEvent, Enum.UserInputState.Change)
+	end)
+
+	UserInputService.InputEnded:Connect(function(inputObject, gameProcessedEvent)
+		Input._parse_input(inputObject, gameProcessedEvent, Enum.UserInputState.End)
+	end)
 
 	velocity_track = VelocityTrack.new()
 end
@@ -115,45 +176,107 @@ function Input._run(dt)
 	velocity_track:update(mouse_delta, mouse_delta)
 end
 
-function Input._parse_input_began(inputObject: InputObject, gameProcessedEvent: boolean)
+function Input._parse_input(inputObject, gameProcessedEvent, inputState)
 	if disabled_input then
 		return
 	end
 
-	if inputObject.KeyCode ~= Enum.KeyCode.Unknown then
-		if inputObject.UserInputType == Enum.UserInputType.Keyboard then
-			keys_pressed:Insert(inputObject.KeyCode)
+	-- Handle key state tracking
+	if inputState == Enum.UserInputState.Begin then
+		if inputObject.KeyCode ~= Enum.KeyCode.Unknown then
+			if inputObject.UserInputType == Enum.UserInputType.Keyboard then
+				keys_pressed:Insert(inputObject.KeyCode)
+			end
+		end
+
+		-- Track mouse buttons
+		if inputObject.UserInputType.Name:match("MouseButton") then
+			mouse_button_mask:Insert(inputObject.UserInputType)
+		end
+	elseif inputState == Enum.UserInputState.End then
+		if inputObject.KeyCode ~= Enum.KeyCode.Unknown then
+			if inputObject.UserInputType == Enum.UserInputType.Keyboard then
+				keys_pressed:Remove(inputObject.KeyCode)
+			end
+		end
+
+		-- Remove from mouse button mask
+		if inputObject.UserInputType.Name:match("MouseButton") then
+			mouse_button_mask:Remove(inputObject.UserInputType)
 		end
 	end
 
-	local event = inputs_pressed_events[inputObject]
-	if inputs_pressed_events[inputObject] then
-		event:Fire()
+	-- Fire input signals
+	local inputArray = getInputArray(inputState)
+	if not inputArray then return end
+
+	-- Fire signal for the input type
+	local event = inputArray[inputObject.UserInputType]
+	if event then
+		event:Fire(inputObject)
+	end
+
+	-- Fire signal for the key code if it's a keyboard input
+	if inputObject.UserInputType == Enum.UserInputType.Keyboard then
+		local keyEvent = inputArray[inputObject.KeyCode]
+		if keyEvent then
+			keyEvent:Fire(inputObject)
+		end
+	end
+
+	-- Check if any action should be triggered
+	if not gameProcessedEvent then
+		Input._check_action_signals(inputObject, inputState)
 	end
 end
 
---[=[
-	Simulate the press of an action.
+function Input._check_action_signals(inputObject, inputState)
+	for _, actionName, signalData in pairs(actions_signals) do
+		local action = InputMap.GetAction(actionName)
+		if not action then
+			continue
+		end
 
-	@param actionName string
-]=]
+		if not signalData[inputState] then
+			continue
+		end
+
+		local actionTriggered = false
+
+		for _, input in ipairs(action.inputs) do
+			if type(input) == "table" then
+				if Input.IsKeyCombinationPressed(input) and inputState == Enum.UserInputState.Begin then
+					actionTriggered = true
+					break
+				end
+			elseif typeof(input) == "EnumItem" then
+				if (input == inputObject.UserInputType or input == inputObject.KeyCode) then
+					actionTriggered = true
+					break
+				end
+			end
+		end
+
+		if actionTriggered then
+			signalData[inputState]:Fire()
+		end
+	end
+end
+
 function Input.ActionPress(actionName: string)
+	simulateAction(actionName, Enum.UserInputState.Begin, true)
 end
 
---[=[
-	Simulate the release of an action.
-
-	@param actionName string
-]=]
 function Input.ActionRelease(actionName: string)
+	simulateAction(actionName, Enum.UserInputState.End, false)
 end
 
---[=[
-	Gets the last known mouse screen velocity.
-	Mouse velocity is only calculated every 0.1 seconds.
-]=]
 function Input.GetLastMouseScreenVelocity()
 	return VelocityTrack.velocity
+end
+
+function Input.GetMousePosition()
+	return UserInputService:GetMouseLocation()
 end
 
 function Input.IsActionPressed(actionName: string)
@@ -164,6 +287,11 @@ function Input.IsActionPressed(actionName: string)
 	local action = InputMap.GetAction(actionName)
 	if not action then
 		return
+	end
+
+	if action.api_called then
+		action.api_called = false
+		return action.pressed
 	end
 
 	for _, button in ipairs(action.inputs) do
@@ -181,9 +309,6 @@ function Input.IsActionPressed(actionName: string)
 	return false
 end
 
---[=[
-	Returns true if any keys are pressed.
-]=]
 function Input.IsAnythingPressed()
 	if disabled_input then
 		return false
@@ -196,9 +321,6 @@ function Input.IsAnythingPressed()
 	return true
 end
 
---[=[
-	Returns true if any actions beside the mouse are pressed.
-]=]
 function Input.IsAnythingExceptMouseArePressed()
 	if disabled_input then
 		return false
@@ -240,7 +362,23 @@ function Input.IsKeyCombinationPressed(keys: {Enum.KeyCode})
 end
 
 function Input.IsMouseButtonPressed(mouseButton: Enum.UserInputType)
+	if disabled_input then
+		return false
+	end
 
+	return mouse_button_mask:Has(mouseButton)
+end
+
+function Input.ListenActionPressed(actionName: string)
+	return newActionSignal(actionName, Enum.UserInputState.Begin)
+end
+
+function Input.ListenActionChanged(actionName: string)
+	return newActionSignal(actionName, Enum.UserInputState.Change)
+end
+
+function Input.ListenActionReleased(actionName: string)
+	return newActionSignal(actionName, Enum.UserInputState.End)
 end
 
 function Input.ListenInputPressed(input: Enum.KeyCode)
@@ -253,6 +391,16 @@ end
 
 function Input.ListenInputReleased(input: Enum.KeyCode)
 	return newInputSignal(input, inputs_released_events)
+end
+
+function Input.SetInputEnabled(enabled)
+	disabled_input = enabled
+
+	if disabled_input then
+		keys_pressed:Clear()
+		mouse_button_mask:Clear()
+		velocity_track:reset()
+	end
 end
 
 return Input

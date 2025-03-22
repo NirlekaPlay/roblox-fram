@@ -27,7 +27,9 @@ local Action = {} do
 	function Action.new(actionName: string)
 		return setmetatable({
 			name = actionName,
-			inputs = Array.new()
+			inputs = Array.new(),
+			pressed = false,
+			api_called = false
 		}, Action)
 	end
 end
