@@ -198,7 +198,6 @@ function Dasar.extract_and_preload_modules(parent)
 			Dasar.extract_and_preload_modules(child)
 		end
 
-		print(child)
 		task.spawn(Dasar.PreloadModule, child, initRecursive)
 	end
 end
@@ -238,7 +237,6 @@ end
 	```
 ]=]
 function Dasar.PreloadModule(moduleInstance, recursive)
-	warn(moduleInstance)
 	return Promise.new(function(resolve)
 		err_instance(moduleInstance, "moduleInstance", "ModuleScript")
 		recursive = recursive or initRecursive
