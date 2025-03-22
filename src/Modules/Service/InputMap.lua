@@ -28,7 +28,7 @@ local Action = {} do
 	function Action.new(actionName: string)
 		return setmetatable({
 			name = actionName,
-			inputs = Array.new(),
+			inputs = Dictionary.new(),
 			pressed = false,
 			api_called = false
 		}, Action)
@@ -64,7 +64,7 @@ function InputMap.ActionRemoveInput(actionName: string, input: EnumItem | {[any]
 			if not type(k_input) == "table" then
 				continue
 			end
-			if Array.table_is_equal(k_input, input) then
+			if k_input:HasAll(input) then
 				action.inputs[i] = nil
 			end
 		end
@@ -88,12 +88,14 @@ end
 function InputMap.AddAction(actionName: string)
 	ERR_TYPE(actionName, "actionName", "string")
 	ERR_FAIL_COND_MSG(input_map:Has(actionName), string.format("InputMap already has action '%s'", actionName))
+
 	input_map[actionName] = Action.new(actionName)
 end
 
 function InputMap.RemoveAction(actionName: string)
 	ERR_TYPE(actionName, "actionName", "string")
 	ERR_FAIL_COND_MSG(not input_map:Has(actionName), string.format("InputMap does not have action '%s'", actionName))
+
 	input_map:Remove(actionName)
 end
 
