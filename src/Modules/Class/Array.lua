@@ -10,189 +10,203 @@
 ]=]
 
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
-local Signal = require("Signal")
+local ErrorMacros = require("error_macros")
 
-local next = next
-local error = error
-local format = string.format
-local tostring = tostring
+local ERR_FAIL_COND_MSG = ErrorMacros.ERR_FAIL_COND_MSG
+local ERR_THROW = ErrorMacros.ERR_THROW
+local ERR_TYPE = ErrorMacros.ERR_TYPE
 
-local function strictTypeSet(t, i, v)
-	local currentValue = t[i]
-	if not currentValue then
-		error(format("Attempt to set Array::%s (not a valid member)\n\n", tostring(i)))
-	end
+local MAX_RECURSION = 15
+local HASH_MURMUR3_SEED = 0
 
-	if typeof(v) ~= typeof(currentValue) then
-		error(format("Attempt to set Array[%s] = %s (not a valid type)\n\n", tostring(i), tostring(v)))
-	end
+local bit32 = bit32
+local type = type
+local getmetatable = getmetatable
 
-	if typeof(v) == "Instance" and v.ClassName ~= currentValue.ClassName then
-		error(format("Attempt to set Array[%s] = %s (wrong Instance type)\n\n", tostring(i), tostring(v)))
-	end
+local function rotate_left(a, n)
+	return bit32.bor(bit32.lshift(a, n), bit32.rshift(a, 32 - n))
+end
+
+local function hash_fmix32(h)
+	h = bit32.bxor(h, bit32.rshift(h, 16))
+	h = (h * 0x85ebca6b) % 4294967296
+	h = bit32.bxor(h, bit32.rshift(h, 13))
+	h = (h * 0xc2b2ae35) % 4294967296
+	h = bit32.bxor(h, bit32.rshift(h, 16))
+	return h
+end
+
+local function hash_murmur3_one_32(p_in, p_seed)
+	p_seed = p_seed or HASH_MURMUR3_SEED
+	p_in = (p_in * 0xcc9e2d51) % 4294967296
+	p_in = rotate_left(p_in, 15)
+	p_in = (p_in * 0x1b873593) % 4294967296
+	p_seed = bit32.bxor(p_seed, p_in)
+	p_seed = rotate_left(p_seed, 13)
+	p_seed = (p_seed * 5 + 0xe6546b64) % 4294967296
+	return p_seed
 end
 
 local Array = {}
 Array.__index = Array
 
---[=[
-	Creates a new Array instance with optional constraints.
-
-	- If `readonly` is enabled, modifications will raise an error.
-	- If `track` is enabled, changes will trigger an event.
-	- If `strict` is enabled, modifications must meet the following conditions:
-		* The key (`t[i]`) must exist.
-		* The new value must match the original type.
-		* If both are Instances, they must share the same ClassName.
-
-	@param readonly boolean — Prevents modifications if true.
-	@param track boolean — Fires an event on modification.
-	@param strict boolean — Enforces type and existence checks.
-]=]
-function Array.new(readonly: boolean, track: boolean, strict: boolean)
-	local self = {
-		_readonly = readonly or false,
-		_track = track or false,
-		_strict = strict or false
-	}
-	local proxy = { __self = self }
-
-	local mt = {
-		__index = function (t, k)
-			local value = Array[k] or self[k]
-			if type(value) == "function" then
-				return function(_, ...) return value(self, ...) end
-			end
-			return value
-		end,
-		__newindex = function (_, k, v)
-			if self._readonly then
-				error("attempt to update a read-only table", 3)
-			end
-			if self._strict then
-				strictTypeSet(self, k, v)
-			end
-			if self._track then
-				if self.changed == nil then
-					self.changed = Signal.new()
-				end
-
-				self.Signal:Fire(k, v)
-			end
-			self[k] = v
-		end,
-		__len = function(_)
-			return Array:GetLength()
-		end
-	}
-	setmetatable(proxy, mt)
-	return proxy
+function Array.new()
+	return setmetatable({
+		_data = {},
+		_readonly = false
+	}, Array)
 end
 
-function Array:DeepCopy()
-	if self:GetLength() <= 0 then
-		return Array.new()
+function Array.fromTable(from: {})
+end
+
+function Array:__index(index)
+	if Array[index] then
+		return Array[index]
+	else
+		return self._data[index]
+	end
+end
+
+function Array:__newindex(index, newValue)
+	if self._readonly then
+		ERR_THROW("Cannot modify a readonly Array!")
 	end
 
+	if type(index) ~= "number" then
+		ERR_THROW("Attempt to Array[x] = y; 'x' is not a number!")
+	end
 
+	if index < 0 or index > self:Size() then
+		ERR_THROW("Attempt to Array[x] = y; 'x' is negative or out of range!")
+	end
+
+	self._data[index] = newValue
 end
 
-function Array:IsEmpty()
-	return Array.table_is_empty(self)
+function Array:isArray(value)
+	return type(value) == "table" and getmetatable(value) == Array
 end
 
-function Array:Insert(v: any)
-	table.insert(self, v)
+function Array:recursive_hash(recursion_count)
+	if recursion_count > MAX_RECURSION then
+		error("Max recursion reached")
+	end
+
+	local h = hash_murmur3_one_32(1)
+	recursion_count = recursion_count + 1
+
+	-- Iterate over each key-value pair in the dictionary
+	for _, kv in ipairs(self._data) do
+		-- It is assumed that kv.key and kv.value are objects that implement a recursive_hash(recursion_count) method.
+		h = hash_murmur3_one_32(kv.key:recursive_hash(recursion_count), h)
+		h = hash_murmur3_one_32(kv.value:recursive_hash(recursion_count), h)
+	end
+
+	return hash_fmix32(h)
+end
+
+function Array:Clear()
+	table.clear(self._data)
+end
+
+function Array:Duplicate(deep: boolean, copies)
+	local dict_copy = Array.new()
+	copies = copies or {}
+
+	if copies[self._data] then
+		return copies[self._data]
+	end
+
+	copies[self._data] = dict_copy._data
+
+	local function deepcopy(value)
+		if not deep or type(value) ~= "table" then
+			return value
+		end
+
+		if copies[value] then
+			return copies[value]
+		end
+
+		local copy = {}
+		copies[value] = copy
+
+		for k, v in pairs(value) do
+			copy[k] = deepcopy(v)
+		end
+
+		return copy
+	end
+
+	for key, value in pairs(self._data) do
+		dict_copy._data[key] = deepcopy(value) -- Copy all values into new dictionary
+	end
+
+	return dict_copy
+end
+
+function Array:Erase(value: any)
+	local _, index = self:Has(value)
+	if not index then
+		return
+	end
+
+	table.remove(self._data, index)
+end
+
+function Array:Front()
+	return self._data[1]
+end
+
+function Array:Get(index: number)
+	return self._data[index]
+end
+
+function Array:Has(value: any)
+	if self:Size() <= 0 then
+		return false
+	end
+
+	for i, v in ipairs(self._data) do
+		if v == value then
+			return true, i
+		end
+	end
+
+	return false
+end
+
+function Array:Hash()
+	return self:recursive_hash(0)
+end
+
+function Array:Insert(index: number, value: any)
+	table.insert(self._data, index, value)
 end
 
 function Array:IsReadOnly()
 	return self._readonly
 end
 
-function Array:GetLength()
-	return Array.table_get_length(self)
+function Array:IsEmpty()
+	return self:Size() <= 0
+end
+
+function Array:Size()
+	return #self._data
 end
 
 function Array:MakeReadOnly()
 	self._readonly = true
 end
 
-function Array:Has(v: any)
-	return self[v] ~= nil
+function Array:PickRandom()
+	return self._data[math.random(1, self:Size())]
 end
 
-function Array:Remove(i: any)
-	if not self:Has(i) then
-		return
-	end
-
-	table.remove(self, i)
-end
-
-function Array:Clear()
-	if self:GetLength() <= 0 then
-		return
-	end
-
-	for i: string, v in pairs(self) do
-		if type(i) == "string" then
-			if i:find("^_") or i:find("^__") then
-				return
-			end
-		end
-
-		i = nil
-	end
-end
-
-function Array.table_is_empty(t: {})
-	return next(t) == nil
-end
-
-function Array.table_is_equal(t1: {}, t2: {})
-	if #t1 ~= #t2 then
-		return false
-	end
-
-	for i = 1, #t1 do
-		if t1[i] ~= t2[i] then
-			return false
-		end
-	end
-
-	return true
-end
-
-function Array.table_get_length(t: {})
-	if Array.table_is_empty(t) then
-		return 0
-	end
-
-	local length = 0
-	for i, v in pairs(t) do
-		if type(v) == "function" then
-			continue
-		end
-		if type(i) == "string" and (i:find("__") or i:find("_")) then
-			continue
-		end
-		length += 1
-	end
-
-	return length
-end
-
-function Array.table_get_real_length(t: {})
-	if Array.table_is_empty(t) then
-		return 0
-	end
-
-	local length = 0
-	for _, _ in pairs(t) do
-		length += 1
-	end
-
-	return length
+function Array:Remove(index: number)
+	table.remove(self._data, index)
 end
 
 return Array

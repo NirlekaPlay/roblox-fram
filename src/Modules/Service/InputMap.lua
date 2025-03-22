@@ -12,6 +12,7 @@
 
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
 local Array = require("Array")
+local Dictionary = require("Dictionary")
 local Signal = require("Signal")
 local ErrorMacros = require("error_macros")
 
@@ -19,7 +20,7 @@ local ERR_FAIL_COND_MSG = ErrorMacros.ERR_FAIL_COND_MSG
 local ERR_THROW = ErrorMacros.ERR_THROW
 local ERR_TYPE = ErrorMacros.ERR_TYPE
 
-local input_map = Array.new()
+local input_map = Dictionary.new()
 
 local Action = {} do
 	Action.__index = Action
@@ -97,7 +98,7 @@ function InputMap.RemoveAction(actionName: string)
 end
 
 function InputMap.HasAction(actionName: string)
-	return InputMap:Has(actionName)
+	return input_map:Has(actionName)
 end
 
 function InputMap.GetAction(actionName: string)
