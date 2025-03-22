@@ -31,8 +31,8 @@ local socketArray
 local speaker_pan
 local tiltMouse = false
 
-local maxTilt = 15
-local smoothTime = 1
+local maxTilt = 120
+local smoothTime = 1.5
 local smoothTiltX = SmoothValue.new(Vector3.new(0, 0, 0), smoothTime)
 local smoothTiltY = SmoothValue.new(Vector3.new(0, 0, 0), smoothTime)
 
@@ -56,6 +56,7 @@ end
 
 function CameraManager._run(dt)
 	CameraManager.LerpMovement(dt)
+	CameraManager.TiltCameraToMouse(dt)
 end
 
 function CameraManager.SetTiltCamera(value: boolean)
