@@ -20,7 +20,9 @@ local Maid = require("Maid")
 local Signal = require("Signal")
 
 local keys_pressed = Array.new()
-local keys_events = Array.new()
+local inputs_pressed_events = Array.new()
+local inputs_changed_events = Array.new()
+local inputs_released_events = Array.new()
 local mouse_button_mask = Array.new()
 local disabled_input: boolean = false
 
@@ -85,6 +87,19 @@ local VelocityTrack = {} do
 	end
 end
 
+local function newInputSignal(input, array)
+	if typeof(input) ~= "EnumItem" then
+		return
+	end
+
+	local event = array[input]
+	if not event then
+		local signal = Signal.new()
+		array[input] = signal
+		return signal
+	end
+end
+
 local Input = {}
 
 function Input._ready()
@@ -96,7 +111,8 @@ function Input._ready()
 end
 
 function Input._run(dt)
-	velocity_track:update(dt)
+	local mouse_delta = UserInputService:GetMouseDelta()
+	velocity_track:update(mouse_delta, mouse_delta)
 end
 
 function Input._parse_input_began(inputObject: InputObject, gameProcessedEvent: boolean)
@@ -108,6 +124,11 @@ function Input._parse_input_began(inputObject: InputObject, gameProcessedEvent: 
 		if inputObject.UserInputType == Enum.UserInputType.Keyboard then
 			keys_pressed:Insert(inputObject.KeyCode)
 		end
+	end
+
+	local event = inputs_pressed_events[inputObject]
+	if inputs_pressed_events[inputObject] then
+		event:Fire()
 	end
 end
 
@@ -222,10 +243,16 @@ function Input.IsMouseButtonPressed(mouseButton: Enum.UserInputType)
 
 end
 
-function Input.ListenKeyPress(action: Enum.KeyCode)
-	if not (typeof(action) == "EnumItem" and action.EnumType == Enum.KeyCode) then
-		return
-	end
+function Input.ListenInputPressed(input: Enum.KeyCode)
+	return newInputSignal(input, inputs_pressed_events)
+end
+
+function Input.ListenInputChanged(input: Enum.KeyCode)
+	return newInputSignal(input, inputs_changed_events)
+end
+
+function Input.ListenInputReleased(input: Enum.KeyCode)
+	return newInputSignal(input, inputs_released_events)
 end
 
 return Input

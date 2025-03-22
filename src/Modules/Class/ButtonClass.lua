@@ -51,12 +51,12 @@ function ButtonClass:_bind_methods()
 		clickDetector.MouseHoverLeave:Connect(function()
 			self:OnLeave()
 		end),
-		Input.ListenKeyPress(Enum.UserInputType.MouseButton1):Connect(function()
+		Input.ListenInputPressed(Enum.UserInputType.MouseButton1):Connect(function()
 			if self._mouseHovered then
 				self.MouseButton1Click:Fire()
 			end
 		end),
-		Input.ListenKeyLift(Enum.UserInputType.MouseButton1):Connect(function()
+		Input.ListenInputReleased(Enum.UserInputType.MouseButton1):Connect(function()
 			self.MouseButton1Lift:Fire()
 		end)
 	})
