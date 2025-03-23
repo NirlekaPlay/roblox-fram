@@ -15,16 +15,17 @@ local UserInputService = game:GetService("UserInputService")
 
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
 local Array = require("Array")
+local Dictionary = require("Dictionary")
 local InputMap = require("InputMap")
 local Maid = require("Maid")
 local Signal = require("Signal")
 
-local actions_signals = Array.new()
-local keys_pressed = Array.new()
-local inputs_pressed_events = Array.new()
-local inputs_changed_events = Array.new()
-local inputs_released_events = Array.new()
-local mouse_button_mask = Array.new()
+local actions_signals = Dictionary.new()
+local keys_pressed = Dictionary.new()
+local inputs_pressed_events = Dictionary.new()
+local inputs_changed_events = Dictionary.new()
+local inputs_released_events = Dictionary.new()
+local mouse_button_mask = Dictionary.new()
 local disabled_input: boolean = false
 
 local velocity_track
@@ -93,14 +94,7 @@ local function newInputSignal(input, array)
 		return
 	end
 
-	local event = array[input]
-	if not event then
-		local signal = Signal.new()
-		array[input] = signal
-		return signal
-	end
-
-	return event
+	return array:GetOrAdd(input, Signal.new())
 end
 
 local function newActionSignal(actionName, inputState)
@@ -185,24 +179,24 @@ function Input._parse_input(inputObject, gameProcessedEvent, inputState)
 	if inputState == Enum.UserInputState.Begin then
 		if inputObject.KeyCode ~= Enum.KeyCode.Unknown then
 			if inputObject.UserInputType == Enum.UserInputType.Keyboard then
-				keys_pressed:Insert(inputObject.KeyCode)
+				keys_pressed:Set(inputObject.KeyCode)
 			end
 		end
 
 		-- Track mouse buttons
 		if inputObject.UserInputType.Name:match("MouseButton") then
-			mouse_button_mask:Insert(inputObject.UserInputType)
+			mouse_button_mask:Set(inputObject.UserInputType)
 		end
 	elseif inputState == Enum.UserInputState.End then
 		if inputObject.KeyCode ~= Enum.KeyCode.Unknown then
 			if inputObject.UserInputType == Enum.UserInputType.Keyboard then
-				keys_pressed:Remove(inputObject.KeyCode)
+				keys_pressed:Erase(inputObject.KeyCode)
 			end
 		end
 
 		-- Remove from mouse button mask
 		if inputObject.UserInputType.Name:match("MouseButton") then
-			mouse_button_mask:Remove(inputObject.UserInputType)
+			mouse_button_mask:Erase(inputObject.UserInputType)
 		end
 	end
 
