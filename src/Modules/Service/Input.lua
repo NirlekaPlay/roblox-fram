@@ -17,8 +17,11 @@ local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Requ
 local Array = require("Array")
 local Dictionary = require("Dictionary")
 local InputMap = require("InputMap")
-local Maid = require("Maid")
 local Signal = require("Signal")
+local ErrorMacros = require("error_macros")
+
+local ERR_FAIL_COND_MSG = ErrorMacros.ERR_FAIL_COND_MSG
+local ERR_TYPE = ErrorMacros.ERR_TYPE
 
 local actions_signals = Dictionary.new()
 local keys_pressed = Dictionary.new()
@@ -90,17 +93,14 @@ local VelocityTrack = {} do
 end
 
 local function newInputSignal(input, array)
-	if typeof(input) ~= "EnumItem" then
-		return
-	end
+	ERR_TYPE(input, "input", "EnumItem")
 
 	return array:GetOrAdd(input, Signal.new())
 end
 
 local function newActionSignal(actionName, inputState)
-	if not InputMap:HasAction(actionName) then
-		return
-	end
+	ERR_TYPE(actionName, "actionName", "string")
+	ERR_FAIL_COND_MSG(not InputMap.HasAction(actionName), string.format("Attempt to listen to Action '%s' which is nil!", actionName))
 
 	actions_signals[actionName] = actions_signals[actionName] or {}
 	local action_signal = actions_signals[actionName]
@@ -179,13 +179,13 @@ function Input._parse_input(inputObject, gameProcessedEvent, inputState)
 	if inputState == Enum.UserInputState.Begin then
 		if inputObject.KeyCode ~= Enum.KeyCode.Unknown then
 			if inputObject.UserInputType == Enum.UserInputType.Keyboard then
-				keys_pressed:Set(inputObject.KeyCode)
+				keys_pressed:Set(inputObject.KeyCode, true)
 			end
 		end
 
 		-- Track mouse buttons
 		if inputObject.UserInputType.Name:match("MouseButton") then
-			mouse_button_mask:Set(inputObject.UserInputType)
+			mouse_button_mask:Set(inputObject.UserInputType, true)
 		end
 	elseif inputState == Enum.UserInputState.End then
 		if inputObject.KeyCode ~= Enum.KeyCode.Unknown then
@@ -225,19 +225,21 @@ function Input._parse_input(inputObject, gameProcessedEvent, inputState)
 end
 
 function Input._check_action_signals(inputObject, inputState)
-	for _, actionName, signalData in pairs(actions_signals) do
+	for actionName, signalData in actions_signals do
 		local action = InputMap.GetAction(actionName)
 		if not action then
 			continue
 		end
 
-		if not signalData[inputState] then
+		local signal = signalData[inputState]
+
+		if not signal then
 			continue
 		end
 
 		local actionTriggered = false
 
-		for _, input in ipairs(action.inputs) do
+		for _, input in action.inputs do
 			if type(input) == "table" then
 				if Input.IsKeyCombinationPressed(input) and inputState == Enum.UserInputState.Begin then
 					actionTriggered = true
@@ -252,7 +254,7 @@ function Input._check_action_signals(inputObject, inputState)
 		end
 
 		if actionTriggered then
-			signalData[inputState]:Fire()
+			signal:Fire()
 		end
 	end
 end
@@ -288,7 +290,7 @@ function Input.IsActionPressed(actionName: string)
 		return action.pressed
 	end
 
-	for _, button in ipairs(action.inputs) do
+	for _, button in action.inputs do
 		if type(button) == "table" then
 			if Input.IsKeyCombinationPressed(button) then
 				return true
@@ -308,7 +310,7 @@ function Input.IsAnythingPressed()
 		return false
 	end
 
-	if keys_pressed:IsEmpty() and mouse_button_mask:IsEmpty() then
+	if (keys_pressed:IsEmpty() and mouse_button_mask:IsEmpty()) then
 		return false
 	end
 
@@ -338,16 +340,16 @@ function Input.IsKeyPressed(key: Enum.KeyCode)
 end
 
 function Input.IsKeyCombinationPressed(keys: {Enum.KeyCode})
-	if Input.IsAnythingPressed() then
+	if not Input.IsAnythingPressed() then
 		return false
 	end
 
-	if Array.table_is_empty(keys) then
+	if next(keys) == nil then
 		return false
 	end
 
-	for _, keyCode in pairs(keys) do
-		if not Input.IsKeyPressed(keyCode) then
+	for _, key in keys do
+		if not keys_pressed:Has(key) then
 			return false
 		end
 	end

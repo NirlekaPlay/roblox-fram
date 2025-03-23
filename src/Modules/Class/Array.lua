@@ -12,10 +12,7 @@
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
 local ErrorMacros = require("error_macros")
 
-local ERR_FAIL_COND_MSG = ErrorMacros.ERR_FAIL_COND_MSG
 local ERR_THROW = ErrorMacros.ERR_THROW
-local ERR_TYPE = ErrorMacros.ERR_TYPE
-
 local MAX_RECURSION = 15
 local HASH_MURMUR3_SEED = 0
 
@@ -84,23 +81,32 @@ function Array:__newindex(index, newValue)
 	self._data[index] = newValue
 end
 
+function Array:__iter()
+	return pairs(self._data)
+end
+
+function Array:__len()
+	return self:Size()
+end
+
 function Array:isArray(value)
 	return type(value) == "table" and getmetatable(value) == Array
 end
 
 function Array:recursive_hash(recursion_count)
 	if recursion_count > MAX_RECURSION then
-		error("Max recursion reached")
+		ERR_THROW("Max recursion reached!")
 	end
 
 	local h = hash_murmur3_one_32(1)
 	recursion_count = recursion_count + 1
 
-	-- Iterate over each key-value pair in the dictionary
-	for _, kv in ipairs(self._data) do
-		-- It is assumed that kv.key and kv.value are objects that implement a recursive_hash(recursion_count) method.
-		h = hash_murmur3_one_32(kv.key:recursive_hash(recursion_count), h)
-		h = hash_murmur3_one_32(kv.value:recursive_hash(recursion_count), h)
+	for key, value in pairs(self._data) do
+		local keyHash = hash_murmur3_one_32(tostring(key):len(), h)
+		local valueHash = hash_murmur3_one_32(tostring(value):len(), h)
+
+		h = hash_murmur3_one_32(keyHash, h)
+		h = hash_murmur3_one_32(valueHash, h)
 	end
 
 	return hash_fmix32(h)
