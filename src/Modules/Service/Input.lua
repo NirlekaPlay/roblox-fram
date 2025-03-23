@@ -276,7 +276,7 @@ function Input.GetMousePosition()
 end
 
 function Input.IsActionPressed(actionName: string)
-	if Input.IsAnythingPressed() then
+	if not Input.IsAnythingPressed() then
 		return false
 	end
 
