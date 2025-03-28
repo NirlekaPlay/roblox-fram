@@ -189,8 +189,13 @@ function Tweener.new()
 	}, Tweener)
 end
 
-function Tweener:finish()
+function Tweener:_finish()
 	self.finished = true
+end
+
+function Tweener:_start()
+	self.elapsed_time = 0
+	self.finished = false
 end
 
 local PropertyTweener = {}
@@ -241,6 +246,8 @@ function Tweener:SetTween(tween)
 end
 
 function PropertyTweener:start()
+	self:_start()
+
 	if not self.target_object then
 		warn("Target object is nil. Aborting tween...")
 		return
@@ -270,7 +277,8 @@ function PropertyTweener:step(delta_time: number)
 	if self.elapsed_time < self.start_delay then
 		delta_time = 0
 		return true
-	elseif self.do_continue_delay and MathLib.isZeroApprox(self.start_delay) then
+	elseif self.do_continue_delay and (not MathLib.isZeroApprox(self.start_delay)) then
+		self.initial_value = get_indexed(self.target_object, self.target_property)
 		self.do_continue_delay = false
 	end
 
@@ -283,7 +291,7 @@ function PropertyTweener:step(delta_time: number)
 		return true
 	else
 		delta_time = self.elapsed_time - self.start_delay - self.duration
-		self:finish()
+		self:_finish()
 		return false
 	end
 end
@@ -319,7 +327,7 @@ end
 	In this case, connects `Tween:step()` method to RunService.PreAnimation event.
 ]=]
 function Tween:_bind_methods()
-	self._runService_connection = RunService.PreAnimation:Connect(function(deltaTimeSim)
+	self._runService_connection = RunService.RenderStepped:Connect(function(deltaTimeSim)
 		self:step(deltaTimeSim)
 	end)
 end
