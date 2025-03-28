@@ -31,6 +31,14 @@ function lib.ERR_NIL(value: any, valueName: string)
 	error(format("'%s' must not be nil.\n\n%s", valueName, debug.traceback()), 4)
 end
 
+function lib.ERR_INDEX_NIL(t: {}, key: any, valueName: string)
+	if t[key] then
+		return
+	end
+
+	error(format("Attempt to index %s with nil %s.\n\n%s", valueName, key, debug.traceback()), 4)
+end
+
 --[=[
 	Throws an error if the given value is a wrong type.
 ]=]

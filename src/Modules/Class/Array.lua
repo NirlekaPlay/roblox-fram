@@ -45,7 +45,7 @@ local function hash_murmur3_one_32(p_in, p_seed)
 end
 
 local Array = {}
-Array.__index = Array
+setmetatable({__index = Array, __call = function() return Array.new() end}, Array)
 
 function Array.new()
 	return setmetatable({
@@ -188,7 +188,11 @@ function Array:Hash()
 end
 
 function Array:Insert(index: number, value: any)
-	table.insert(self._data, index, value)
+	if index then
+		return table.insert(self._data, index, value)
+	else
+		return table.insert(self._data, value)
+	end
 end
 
 function Array:IsReadOnly()

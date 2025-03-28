@@ -7,6 +7,7 @@
 ]]
 
 local random = Random.new(tick())
+local math = math
 
 local lib = {}
 
@@ -43,6 +44,10 @@ end
 
 function lib.isOdd(n)
 	return not (n % 2 == 0)
+end
+
+function lib.isZeroApprox(n)
+	return math.abs(n) < 0.00001
 end
 
 function lib.Randomize(seed)
