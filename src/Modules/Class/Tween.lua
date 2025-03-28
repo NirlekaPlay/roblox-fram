@@ -13,7 +13,7 @@
 local RunService = game:GetService("RunService")
 local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Require
 local Dict = require("Dictionary")
-local EasingEquations = require("easing_equations")
+local Equations = require("easing_equations")
 local ErrorMacros = require("error_macros")
 local MathLib = require("math")
 
@@ -25,27 +25,57 @@ local ERR_INDEX_NIL = ErrorMacros.ERR_INDEX_NIL
 local ERR_MSG_OBJECT_TYPE = "'object' parameter must be either a table or Instance. Got %s"
 local ERR_MSG_PROPERTY_NIL = "Attempt to tween a nil property %s ...[%s]!"
 
+local TWEENABLE_DATATYPES = {
+	Color3 = 1,
+	CFrame = 2,
+	Vector2 = 3,
+	Vector3 = 4
+}
+
 local ENUM_TRANSITION_TYPES = {
-	TRANS_LINEAR = "linear",
-	TRANS_SINE = "sine",
-	TRANS_QUINT = "quint",
-	TRANS_QUART = "quart",
-	TRANS_QUAD = "quad",
-	TRANS_EXPO = "expo",
-	TRANS_ELASTIC = "elastic",
-	TRANS_CUBIC = "cubic",
-	TRANS_CIRC = "circ",
-	TRANS_BOUNCE = "bounce",
-	TRANS_BACK = "back",
-	TRANS_SPRING = "spring",
+	TRANS_LINEAR = 1,
+	TRANS_SINE = 2,
+	TRANS_QUINT = 3,
+	TRANS_QUART = 4,
+	TRANS_QUAD = 5,
+	TRANS_EXPO = 6,
+	TRANS_ELASTIC = 7,
+	TRANS_CUBIC = 8,
+	TRANS_CIRC = 4,
+	TRANS_BOUNCE = 5,
+	TRANS_BACK = 6,
+	TRANS_SPRING = 7,
 }
 
 local ENUM_EASING_TYPES = {
-	EASE_IN = "in",
-	EASE_OUT = "out",
-	EASE_IN_OUT = "in_out",
-	EASE_OUT_IN = "out_in"
+	EASE_IN = 1,
+	EASE_OUT = 2,
+	EASE_IN_OUT = 3,
+	EASE_OUT_IN = 4
 }
+
+local INTERPOLATORS = {}
+do
+	local easing_names = {
+		"linear", "sine", "quint", "quart", "quad",
+		"expo", "elastic", "cubic", "circ",
+		"bounce", "back", "spring"
+	}
+
+	local easing_methods = {
+		[ENUM_EASING_TYPES.EASE_IN] = "in_",
+		[ENUM_EASING_TYPES.EASE_OUT] = "out",
+		[ENUM_EASING_TYPES.EASE_IN_OUT] = "in_out",
+		[ENUM_EASING_TYPES.EASE_OUT_IN] = "out_in"
+	}
+
+	for i, name in ipairs(easing_names) do
+		INTERPOLATORS[i] = {}
+		for j, method in pairs(easing_methods) do
+			INTERPOLATORS[i][j] = Equations[name][method]
+		end
+	end
+end
 
 --[[
 	Creates an enum dictionary with some metamethods to prevent common mistakes.
@@ -94,6 +124,26 @@ local function get_indexed(object, path)
 end
 
 --[[
+	Gets the `.Lerp()` function of a table or datatype.
+]]
+local function get_lerp(from)
+	if not from then
+		return nil
+	end
+
+	if type(from) == "table" then
+		if type(from.Lerp) == "function" then
+			return from.Lerp
+		end
+
+	elseif TWEENABLE_DATATYPES[typeof(from)] then
+		return from.Lerp
+	end
+
+	return nil
+end
+
+--[[
 	Assigns a new `value` to a property of an Instance or table with a path string.
 	See `get_indexed_value()`
 ]]
@@ -139,9 +189,8 @@ function Tweener.new()
 	}, Tweener)
 end
 
-function Tweener:SetTween(tween)
-	self.tween = tween
-	return self
+function Tweener:finish()
+	self.finished = true
 end
 
 local PropertyTweener = {}
@@ -163,7 +212,8 @@ function PropertyTweener.new(target_object, property, target_value, duration)
 		do_continue_delay = false,
 		do_continue = true,
 
-
+		trans_type = nil,
+		ease_type = nil
 
 	}, PropertyTweener)
 end
@@ -183,6 +233,13 @@ function PropertyTweener:SetTransition(trans)
 	return self
 end
 
+function Tweener:SetTween(tween)
+	self.trans_type = tween.default_transititon
+	self.ease_type = tween.default_ease
+	self.tween = tween
+	return self
+end
+
 function PropertyTweener:start()
 	if not self.target_object then
 		warn("Target object is nil. Aborting tween...")
@@ -198,7 +255,7 @@ function PropertyTweener:start()
 	end
 end
 
-function PropertyTweener:step(delta: number)
+function PropertyTweener:step(delta_time: number)
 	if self.finished then
 		return false
 	end
@@ -208,10 +265,10 @@ function PropertyTweener:step(delta: number)
 		return false
 	end
 
-	self.elapsed_time += delta
+	self.elapsed_time += delta_time
 
-	if self.elapsed < self.start_delay then
-		delta = 0
+	if self.elapsed_time < self.start_delay then
+		delta_time = 0
 		return true
 	elseif self.do_continue_delay and MathLib.isZeroApprox(self.start_delay) then
 		self.do_continue_delay = false
@@ -220,12 +277,12 @@ function PropertyTweener:step(delta: number)
 	local time = math.min(self.elapsed_time - self.start_delay, self.duration)
 
 	if time < self.duration then
-		local interpolated_value = Tween.interpolate_variant(self.initial_value, self.target_value, time, self.duration, self.trans_type, self.ease_type)
+		local interpolated_value = Tween.interpolate_variant(time, self.initial_value, self.target_value, self.duration, self.trans_type, self.ease_type)
 		set_indexed(self.target_object, self.target_property, interpolated_value)
-		delta = 0
+		delta_time = 0
 		return true
 	else
-		delta = self.elapsed_time - self.start_delay - self.duration
+		delta_time = self.elapsed_time - self.start_delay - self.duration
 		self:finish()
 		return false
 	end
@@ -233,8 +290,8 @@ end
 
 function Tween.new()
 	local self = setmetatable({
-		default_transititon = EasingEquations[ENUM_TRANSITION_TYPES.TRANS_LINEAR],
-		default_ease = EasingEquations[ENUM_TRANSITION_TYPES.TRANS_LINEAR][ENUM_EASING_TYPES.EASE_IN_OUT],
+		default_transititon = ENUM_TRANSITION_TYPES.TRANS_LINEAR,
+		default_ease = ENUM_EASING_TYPES.EASE_IN,
 		tweeners = Dict.new(),
 		total_time = 0,
 		current_step = -1,
@@ -258,35 +315,41 @@ function Tween.new()
 	return self
 end
 
+--[=[
+	In this case, connects `Tween:step()` method to RunService.PreAnimation event.
+]=]
 function Tween:_bind_methods()
 	self._runService_connection = RunService.PreAnimation:Connect(function(deltaTimeSim)
 		self:step(deltaTimeSim)
 	end)
 end
 
-function Tween.run_equation(trans_type, ease_type, initial_value, delta_value, duration)
+--[=[
+	Every easing functions inside `easing_equations.lua` have 4 parameters:
+
+
+]=]
+function Tween.run_equation(time, initial_value, delta_value, duration, trans_type, ease_type)
 	if duration == 0 then
 		return initial_value + delta_value
 	end
 
-	local func = EasingEquations[trans_type][ease_type]
+	local func = INTERPOLATORS[trans_type][ease_type]
 	return func(time, initial_value, delta_value, duration)
 end
 
-function Tween.interpolate_variant(initial_value, target_value, elapsed, duration, trans_type, ease_type)
-	ERR_INDEX_NIL(EasingEquations, trans_type, "EasingEquations")
-	ERR_INDEX_NIL(EasingEquations, ease_type, "EasingEquations")
+function Tween.interpolate_variant(time, initial_value, target_value, duration, trans_type, ease_type)
+	ERR_INDEX_NIL(INTERPOLATORS, trans_type, "EasingEquations")
+	ERR_INDEX_NIL(INTERPOLATORS, ease_type, "EasingEquations")
 
-	local alpha = Tween.run_equation(elapsed, 0, 1, duration)
+	local alpha = Tween.run_equation(time, 0.0, 1.0, duration, trans_type, ease_type)
 	if type(initial_value) == "number" then
 		return MathLib.lerp(initial_value, target_value, alpha)
-	elseif type(initial_value) == "table" or typeof(initial_value) == "Instance" then
-		local value_lerp = initial_value["Lerp"]
-		if not (type(value_lerp) == "function") then
-			return
-		end
+	end
 
-		return value_lerp(target_value, alpha)
+	local lerp_func = get_lerp(initial_value)
+	if lerp_func then
+		return initial_value:Lerp(target_value, alpha)
 	end
 end
 
@@ -300,7 +363,7 @@ function Tween:append(tweener)
 	end
 	self.parrarel_enabled = self.default_parrarel
 
-	table.insert(self.tweeners, self.current_step)
+	self.tweeners[self.current_step] = {}
 	table.insert(self.tweeners[self.current_step], tweener)
 end
 
@@ -343,7 +406,7 @@ function Tween:step(delta: number)
 		local step_delta = rem_delta
 		step_active = false
 
-		for _, tweener in self.tweeners do
+		for _, tweener in self.tweeners[self.current_step] do
 
 			local temp_delta = rem_delta
 
@@ -391,7 +454,7 @@ function Tween:TweenProperty(object: {[any]:any} | Instance, property: string, f
 	local tweener = PropertyTweener.new(object, property, final_val, duration)
 	self:append(tweener)
 
-	return
+	return tweener
 end
 
 return Tween
