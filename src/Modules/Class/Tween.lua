@@ -410,37 +410,35 @@ function Tween:step(delta: number)
 	local step_active = false
 	self.total_time += rem_delta
 
-	while rem_delta > 0 and self.running do
-		local step_delta = rem_delta
-		step_active = false
+	local step_delta = rem_delta
+	step_active = false
 
-		for _, tweener in self.tweeners[self.current_step] do
+	for _, tweener in self.tweeners[self.current_step] do
 
-			local temp_delta = rem_delta
+		local temp_delta = rem_delta
 
-			step_active = tweener:step(temp_delta) or step_active
-			step_delta = math.min(temp_delta, step_delta)
-		end
+		step_active = tweener:step(temp_delta) or step_active
+		step_delta = math.min(temp_delta, step_delta)
+	end
 
-		rem_delta = step_delta
+	rem_delta = step_delta
 
-		if not step_active then
-			self.current_step += 1
+	if not step_active then
+		self.current_step += 1
 
-			if self.current_step == self.tweeners:Size() then
-				self.loops_done += 1
+		if self.current_step == self.tweeners:Size() then
+			self.loops_done += 1
 
-				if self.loops_done == self.loops then
-					self.running = false
-					self.dead = true
-					break
-				else
-					self.current_step = 0
-					self:start_tweeners()
-				end
+			if self.loops_done == self.loops then
+				self.running = false
+				self.dead = true
+				return
 			else
+				self.current_step = 0
 				self:start_tweeners()
 			end
+		else
+			self:start_tweeners()
 		end
 	end
 
