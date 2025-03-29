@@ -177,6 +177,10 @@ end
 
 local Tween = {}
 Tween.__index = Tween
+do
+	make_enum("ENUM_TRANSITION_TYPES", ENUM_TRANSITION_TYPES)
+	make_enum("ENUM_TRANSITION_TYPES", ENUM_EASING_TYPES)
+end
 
 local Tweener = {}
 Tween.__index = Tween
@@ -327,7 +331,7 @@ end
 	In this case, connects `Tween:step()` method to RunService.PreAnimation event.
 ]=]
 function Tween:_bind_methods()
-	self._runService_connection = RunService.RenderStepped:Connect(function(deltaTimeSim)
+	self._runService_connection = RunService.PreAnimation:Connect(function(deltaTimeSim)
 		self:step(deltaTimeSim)
 	end)
 end
@@ -364,14 +368,17 @@ end
 function Tween:append(tweener)
 	tweener:SetTween(self)
 
-	if self.parrarel_enabled then
+	if self.parallel_enabled then
 		self.current_step = math.max(self.current_step, 0)
 	else
 		self.current_step += 1
 	end
-	self.parrarel_enabled = self.default_parrarel
+	self.parallel_enabled = self.default_parallel
 
-	self.tweeners[self.current_step] = {}
+	if not self.tweeners[self.current_step] then
+		self.tweeners[self.current_step] = {}
+	end
+
 	table.insert(self.tweeners[self.current_step], tweener)
 end
 
@@ -443,6 +450,38 @@ function Tween:step(delta: number)
 	end
 
 	return true
+end
+
+function Tween:GetEnumEasingTypes()
+	return ENUM_EASING_TYPES
+end
+
+function Tween:GetEnumTransitionTypes()
+	return ENUM_TRANSITION_TYPES
+end
+
+function Tween:Parallel()
+	self.parallel_enabled = true
+	return self
+end
+
+function Tween:SetEase(ease)
+	self.default_ease = ease
+end
+
+function Tween:SetParallel(enabled)
+	self.default_parallel = enabled
+	self.parallel_enabled = enabled
+	return self
+end
+
+function Tween:SetSpeedScale(speed: number)
+	self.speed_scale = speed
+	return self
+end
+
+function Tween:SetTrans(trans)
+	self.default_transititon = trans
 end
 
 function Tween:TweenProperty(object: {[any]:any} | Instance, property: string, final_val: any, duration: number)
