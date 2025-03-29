@@ -237,7 +237,7 @@ function PropertyTweener:SetEase(ease)
 	return self
 end
 
-function PropertyTweener:SetTransition(trans)
+function PropertyTweener:SetTrans(trans)
 	self.trans_type = trans
 	return self
 end
@@ -336,10 +336,17 @@ function Tween:_bind_methods()
 	end)
 end
 
+function Tween:_stop(reset: boolean)
+	self.running = false
+	if reset then
+		self.started = false
+		self.dead = false
+		self.total_time = 0
+	end
+end
+
 --[=[
-	Every easing functions inside `easing_equations.lua` have 4 parameters:
-
-
+	This is for the *alpha* value for lerping.
 ]=]
 function Tween.run_equation(time, initial_value, delta_value, duration, trans_type, ease_type)
 	if duration == 0 then
@@ -350,6 +357,12 @@ function Tween.run_equation(time, initial_value, delta_value, duration, trans_ty
 	return func(time, initial_value, delta_value, duration)
 end
 
+--[=[
+	Returns the interpolated value between the initial value and the target value.
+	If the value being interpolated is a number, it uses a normal *lerp* function using `MathLib.lerp()`.
+	However, if it is a table or any other datatype that has a `:Lerp()` function,
+	it will use that instead.
+]=]
 function Tween.interpolate_variant(time, initial_value, target_value, duration, trans_type, ease_type)
 	ERR_INDEX_NIL(INTERPOLATORS, trans_type, "EasingEquations")
 	ERR_INDEX_NIL(INTERPOLATORS, ease_type, "EasingEquations")
@@ -452,12 +465,39 @@ function Tween:step(delta: number)
 	return true
 end
 
+function Tween:Chain()
+	self.parallel_enabled = false
+	return self
+end
+
 function Tween:GetEnumEasingTypes()
 	return ENUM_EASING_TYPES
 end
 
 function Tween:GetEnumTransitionTypes()
 	return ENUM_TRANSITION_TYPES
+end
+
+function Tween:IsRunning()
+	return self.running
+end
+
+function Tween:Kill()
+	self.running = false
+	self.dead = true
+end
+
+function Tween:Play()
+	ERR_FAIL_COND_MSG(self.dead, "Can't play finished Tween, use stop() first to reset its state.");
+	self.running = true;
+end
+
+function Tween:Pause()
+	self:_stop(false)
+end
+
+function Tween:Stop()
+	self:_stop(true)
 end
 
 function Tween:Parallel()
@@ -467,6 +507,12 @@ end
 
 function Tween:SetEase(ease)
 	self.default_ease = ease
+	return self
+end
+
+function Tween:SetLoops(amount: number)
+	self.loops = amount
+	return self
 end
 
 function Tween:SetParallel(enabled)
@@ -482,6 +528,7 @@ end
 
 function Tween:SetTrans(trans)
 	self.default_transititon = trans
+	return self
 end
 
 function Tween:TweenProperty(object: {[any]:any} | Instance, property: string, final_val: any, duration: number)
