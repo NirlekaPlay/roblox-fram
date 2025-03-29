@@ -16,6 +16,9 @@ local Dict = require("Dictionary")
 local Equations = require("easing_equations")
 local ErrorMacros = require("error_macros")
 local MathLib = require("math")
+local Maid = require("Maid")
+
+local math = math -- for performance purposes, avoids repeated _G access.
 
 local ERR_FAIL_COND_MSG = ErrorMacros.ERR_FAIL_COND_MSG
 local ERR_THROW = ErrorMacros.ERR_THROW
@@ -180,10 +183,12 @@ Tween.__index = Tween
 do
 	make_enum("ENUM_TRANSITION_TYPES", ENUM_TRANSITION_TYPES)
 	make_enum("ENUM_TRANSITION_TYPES", ENUM_EASING_TYPES)
+	Tween.ENUM_TRANSITION_TYPES = ENUM_TRANSITION_TYPES
+	Tween.ENUM_EASING_TYPES = ENUM_EASING_TYPES
 end
 
 local Tweener = {}
-Tween.__index = Tween
+Tweener.__index = Tween
 
 function Tweener.new()
 	return setmetatable({
@@ -319,7 +324,7 @@ function Tween.new()
 		default_parallel = false,
 		parallel_enabled = false,
 
-		_runService_connection = nil
+		_maid = Maid.new()
 	}, Tween)
 
 	self:_bind_methods()
@@ -331,9 +336,9 @@ end
 	In this case, connects `Tween:step()` method to RunService.PreAnimation event.
 ]=]
 function Tween:_bind_methods()
-	self._runService_connection = RunService.PreAnimation:Connect(function(deltaTimeSim)
+	self._maid:GiveTask(RunService.PreAnimation:Connect(function(deltaTimeSim)
 		self:step(deltaTimeSim)
-	end)
+	end))
 end
 
 function Tween:_stop(reset: boolean)
@@ -416,7 +421,7 @@ function Tween:step(delta: number)
 
 	if not self.started then
 		if self.tweeners:IsEmpty() then
-			ERR_THROW("Attempt to start, no tweeners")
+			return
 		end
 
 		self.current_step = 0
@@ -470,12 +475,22 @@ function Tween:Chain()
 	return self
 end
 
-function Tween:GetEnumEasingTypes()
-	return ENUM_EASING_TYPES
+function Tween:Destroy()
+	self._maid:DoCleaning()
+
+	setmetatable(self, nil)
 end
 
-function Tween:GetEnumTransitionTypes()
-	return ENUM_TRANSITION_TYPES
+function Tween:GetEase()
+	return self.default_ease
+end
+
+function Tween:GetTrans()
+	return self.default_transititon
+end
+
+function Tween:GetTotalElapsedTime()
+	return self.total_time
 end
 
 function Tween:IsRunning()
