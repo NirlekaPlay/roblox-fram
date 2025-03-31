@@ -45,7 +45,13 @@ local function hash_murmur3_one_32(p_in, p_seed)
 end
 
 local Array = {}
-setmetatable({__index = Array, __call = function() return Array.new() end}, Array)
+Array.__index = Array
+
+setmetatable(Array, {
+	__call = function()
+		return Array.new()
+	end
+})
 
 function Array.new()
 	return setmetatable({

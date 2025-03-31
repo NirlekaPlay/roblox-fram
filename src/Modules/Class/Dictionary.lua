@@ -50,6 +50,12 @@ end
 local Dictionary = {}
 Dictionary.__index = Dictionary
 
+setmetatable(Dictionary, {
+	__call = function()
+		return Dictionary.new()
+	end
+})
+
 function Dictionary.new()
 	return setmetatable({
 		_data = {},

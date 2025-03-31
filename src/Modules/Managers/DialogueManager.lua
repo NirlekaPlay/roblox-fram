@@ -38,96 +38,102 @@ local function create_tween(current_tween, trans_type, ease_type)
 	return current_tween
 end
 
-local CharMap = {}
-CharMap.__index = CharMap
+local BASE_DELAYS = {
+	["."] = 0.3,
+	[","] = 0.2,
+	["|"] = 1.0
+}
 
-function CharMap.from(text: string)
-	local characters = {}
-	for i = 1, #text do
-		characters[i] = {
-			char = text:sub(i,i),
-			state = "pending", -- pending/fading/visible
-			progress = 0,
-			startTime = nil
-		}
-	end
+local function playSound()
+	speaker_click.pitch_scale = randf_range(0.2, 0.6)
+	speaker_click:Play()
 end
 
-function CharMap.ParseFormattedText(text)
-	local parsedText = {}
-	local index = 1
-	local length = #text
-	local currentSpeed = nil -- Default speed (nil means it follows the typewriter's default)
+local function processFormatting(text)
+	local segments = {}
+	local currentIndex = 1
 
-	while index <= length do
-		local char = text:sub(index, index)
+	while currentIndex <= #text do
+		local startUnderscore = text:find("_", currentIndex)
 
-		-- Handle Comma Pause (",")
-		if char == "," then
-			table.insert(parsedText, {char = char, pause = 0.3})
+		if startUnderscore then
+			if startUnderscore > currentIndex then
+				table.insert(segments, {
+					text = text:sub(currentIndex, startUnderscore - 1),
+					skip = false
+				})
+			end
 
-			-- Handle Period Pause (".")
-		elseif char == "." then
-			table.insert(parsedText, {char = char, pause = 0.5})
+			local endUnderscore = text:find("_", startUnderscore + 1)
+			if endUnderscore then
+				local word = text:sub(startUnderscore + 1, endUnderscore - 1)
 
-			-- Handle 1-Second Pause ("|")
-		elseif char == "|" then
-			if text:sub(index + 1, index + 1) == "|" then
-				-- Skip, prevent multiple '||' being misread
-				index = index + 1
+				local nextCharIndex = endUnderscore + 1
+				local spaces = ""
+				while nextCharIndex <= #text and text:sub(nextCharIndex, nextCharIndex) == " " do
+					spaces = spaces .. " "
+					nextCharIndex = nextCharIndex + 1
+				end
+
+				table.insert(segments, {
+					text = word .. spaces,
+					skip = true
+				})
+
+				currentIndex = nextCharIndex
 			else
-				table.insert(parsedText, {char = "", pause = 1}) -- No character, just pause
+				table.insert(segments, {
+					text = text:sub(currentIndex),
+					skip = false
+				})
+				break
 			end
-
-			-- Handle Custom Pause ("|n|")
-		elseif char == "|" and text:sub(index + 1, index + 1):match("%d") then
-			local delayStr = ""
-			index = index + 1 -- Move past "|"
-
-			while index <= length and text:sub(index, index):match("%d") do
-				delayStr = delayStr .. text:sub(index, index)
-				index = index + 1
-			end
-
-			if text:sub(index, index) == "|" then
-				table.insert(parsedText, {char = "", pause = tonumber(delayStr) or 1})
-			end
-
-			-- Handle Instant Display ("_text_")
-		elseif char == "_" then
-			local instantText = ""
-			index = index + 1
-
-			while index <= length and text:sub(index, index) ~= "_" do
-				instantText = instantText .. text:sub(index, index)
-				index = index + 1
-			end
-
-			table.insert(parsedText, {char = instantText, pause = 0, instant = true})
-
-			-- Handle Speed Change ("[speed=n]")
-		elseif char == "[" and text:sub(index + 1, index + 6) == "speed=" then
-			local speedStr = ""
-			index = index + 7 -- Move past "[speed="
-
-			while index <= length and text:sub(index, index):match("%d") do
-				speedStr = speedStr .. text:sub(index, index)
-				index = index + 1
-			end
-
-			if text:sub(index, index) == "]" then
-				currentSpeed = tonumber(speedStr) or nil -- Update speed
-			end
-
-			-- Normal Character
 		else
-			table.insert(parsedText, {char = char, pause = 0, speed = currentSpeed})
+			table.insert(segments, {
+				text = text:sub(currentIndex),
+				skip = false
+			})
+			break
 		end
-
-		index = index + 1
 	end
 
-	return parsedText
+	return segments
+end
+
+local function calculatePauseDuration(text, index)
+	local char = text:sub(index, index)
+
+	if char == "|" then
+		local count = 0
+		local i = index
+		while i <= #text and text:sub(i, i) == "|" do
+			count = count + 1
+			i = i + 1
+		end
+		return BASE_DELAYS["|"] * count, count, true
+	end
+
+	if char == "." then
+		local count = 0
+		local i = index
+		while i <= #text and text:sub(i, i) == "." do
+			count = count + 1
+			i = i + 1
+		end
+		return BASE_DELAYS["."] * count, 1, false
+	end
+
+	if char == "," then
+		return BASE_DELAYS[","], 1, false
+	end
+
+	return 0, 1, false
+end
+
+local function cleanText(text)
+	text = text:match("^%s*(.-)%s*$")
+	text = text:gsub("%s+", " ")
+	return text
 end
 
 local DialogueManager = {}
@@ -145,6 +151,7 @@ function DialogueManager.ShowDialogue()
 end
 
 function DialogueManager.StepText(label, text, cps, fadeTime, maxFades)
+
 	label.Text = ""
 	local characters = {}
 	local charDelay = 1/cps
@@ -159,18 +166,18 @@ function DialogueManager.StepText(label, text, cps, fadeTime, maxFades)
 		}
 	end
 
-	local startTime = os.clock()
+	local startTime = tick()
 	local lastCharTime = 0
 	local nextCharIndex = 1
 
 	while true do
-		local currentTime = os.clock() - startTime
+		local currentTime = tick() - startTime
 		local needsUpdate = false
 
 		-- Add new characters when it's their turn
 		while nextCharIndex <= #characters and currentTime >= lastCharTime + charDelay do
 			characters[nextCharIndex].state = "fading"
-			characters[nextCharIndex].startTime = os.clock()
+			characters[nextCharIndex].startTime = tick()
 			lastCharTime = lastCharTime + charDelay
 			nextCharIndex = nextCharIndex + 1
 			needsUpdate = true
@@ -183,7 +190,7 @@ function DialogueManager.StepText(label, text, cps, fadeTime, maxFades)
 
 			if char.state == "fading" then
 				activeFades = activeFades + 1
-				char.progress = math.min(1, (os.clock() - char.startTime)/fadeTime)
+				char.progress = math.min(1, (tick() - char.startTime)/fadeTime)
 
 				if char.progress >= 1 then
 					char.state = "visible"
