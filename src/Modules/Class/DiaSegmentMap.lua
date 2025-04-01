@@ -225,7 +225,7 @@ function DiaSegmentMap:StepAndRender(text: string, label: TextLabel, config)
 	local processor = DiaSegmentProcessor.new(text)
 	local renderer = CharMapRenderer.new(label)
 
-	renderer:setOriginalText(text)
+	renderer:set_original_text(text)
 
 	local startTime = tick()
 
@@ -234,19 +234,19 @@ function DiaSegmentMap:StepAndRender(text: string, label: TextLabel, config)
 		local needsUpdate = false
 
 		-- Process character state updates
-		local charUpdated = processor:advanceCharacters(currentTime, 1/config.cps)
-		local fadeUpdated = processor:updateFadingCharacters(config.fadeTime, config.maxFades)
+		local charUpdated = processor:advance_characters(currentTime, 1/config.cps)
+		local fadeUpdated = processor:update_fading_characters(config.fadeTime, config.maxFades)
 
 		needsUpdate = charUpdated or fadeUpdated
 
 		-- Render if needed
 		if needsUpdate then
-		renderer:renderCharacters(processor.characters)
+		renderer:render_characters(processor.characters)
 		end
 
 		-- Check if complete
-		if processor:isComplete() then
-		renderer:renderFinal()
+		if processor:is_complete() then
+		renderer:render_final()
 		break
 		end
 
