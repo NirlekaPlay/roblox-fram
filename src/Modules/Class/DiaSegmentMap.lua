@@ -12,6 +12,13 @@ local require = require(game:GetService("ReplicatedStorage").Modules.Dasar).Requ
 local Array = require("Array")
 local CharMap = require("CharMap")
 
+local CHAR_DELAYS = {
+	[","] = 0.3,
+	["."] = 0.8,
+	["!"] = 0.9,
+	["|"] = 1.0
+}
+
 local function parse_string_format(text)
 	local segments = Array()
 	local currentIndex = 1
@@ -63,6 +70,13 @@ local function parse_string_format(text)
 	return segments
 end
 
+--[=[
+	Calculates the pause duration dictated by `CHAR_DELAYS`
+]=]
+local function get_pause_duration(char)
+	return CHAR_DELAYS[char] or 0
+end
+
 local CharState
 do
 	CharState = {}
@@ -97,6 +111,18 @@ do
 		local updated = false
 
 		while self.next_char_index <= #self.characters and current_time >= self.last_char_time + char_delay do
+			local current_char = self.characters[self.next_char_index - 1]
+			local pause_time = 0
+
+			if current_char and current_char.char then
+				pause_time = get_pause_duration(current_char.char)
+			end
+
+			if pause_time > 0 and current_char and current_char.state == "fading" then
+				self.last_char_time += pause_time
+				return updated
+			end
+
 			self.characters[self.next_char_index].state = "fading"
 			self.characters[self.next_char_index].start_time = tick()
 			self.last_char_time += char_delay
@@ -171,7 +197,7 @@ do
 			local char = characters[i]
 			if char.state == "visible" then
 				visibleText = visibleText .. char.char
-				elseif char.state == "fading" then
+			elseif char.state == "fading" then
 				fadingText = fadingText .. string.format('<font transparency="%.2f">%s</font>', 1-char.progress, char.char)
 			end
 		end
@@ -191,9 +217,9 @@ do
 
 	function DialogueConfig.new(cps, fade_time, max_fades)
 		return setmetatable({
-			cps = cps or 20,		-- Characters per second
+			cps = cps or 20,				-- Characters per second
 			fade_time = fade_time or 0.2,	-- Time to fade in each character
-			max_fades = max_fades or 3	-- Maximum simultaneous fading characters
+			max_fades = max_fades or 3		-- Maximum simultaneous fading characters
 		}, DialogueConfig)
 	end
 end
@@ -220,38 +246,93 @@ function DiaSegmentMap.IsDiaSegmentMap(value)
 	return getmetatable(value) == DiaSegmentMap
 end
 
-function DiaSegmentMap.StepAndRender(text: string, label: TextLabel, config)
-	config = DialogueConfig.new()
-	local processor = DiaSegmentProcessor.new(text)
-	local renderer = CharMapRenderer.new(label)
+local function calculate_pause_duration(char)
+	return CHAR_DELAYS[char] or 0
+end
 
+function DiaSegmentProcessor:advance_characters(current_time, char_delay)
+	local updated = false
+
+	while self.next_char_index <= #self.characters and current_time >= self.last_char_time + char_delay do
+		local current_char = self.characters[self.next_char_index - 1]
+		local pause_time = 0
+
+		if current_char and current_char.char then
+			pause_time = calculate_pause_duration(current_char.char)
+		end
+
+
+		if pause_time > 0 and current_char and current_char.state == "fading" then
+			self.last_char_time += pause_time
+			return updated
+		end
+
+		self.characters[self.next_char_index].state = "fading"
+		self.characters[self.next_char_index].start_time = tick()
+		self.last_char_time += char_delay
+		self.next_char_index += 1
+		updated = true
+	end
+
+	return updated
+end
+
+function DiaSegmentMap.StepAndRender(text: string, label: TextLabel, config)
+	config = config or DialogueConfig.new()
+	local renderer = CharMapRenderer.new(label)
 	renderer:set_original_text(text)
 
-	local startTime = tick()
+	local text_formatted = parse_string_format(text)
+	local visible_text = ""
+	local start_time = tick()
 
-	while true do
-		local current_time = tick() - startTime
-		local needs_update = false
+	for _, segment in ipairs(text_formatted) do
+		local seg_text = segment.text
+		local processor = DiaSegmentProcessor.new(seg_text)
 
-		-- Process character state updates
-		local charUpdated = processor:advance_characters(current_time, 1/config.cps)
-		local fadeUpdated = processor:update_fading_characters(config.fade_time, config.max_fades)
+		if segment.skip then
+			for i = 1, #processor.characters do
+				processor.characters[i].state = "visible"
+			end
+			visible_text = visible_text .. seg_text
+			renderer.label.Text = visible_text
+		else
+			local segment_complete = false
+			local segment_start_time = tick()
 
-		needs_update = charUpdated or fadeUpdated
+			while not segment_complete do
+				local current_time = tick() - segment_start_time
+				local needs_update = false
 
-		-- Render if needed
-		if needs_update then
-		renderer:render_characters(processor.characters)
+				local charUpdated = processor:advance_characters(current_time, 1/config.cps)
+				local fadeUpdated = processor:update_fading_characters(config.fade_time, config.max_fades)
+
+				needs_update = charUpdated or fadeUpdated
+
+				if needs_update then
+					local current_segment_text = ""
+					for i = 1, #processor.characters do
+						local char = processor.characters[i]
+						if char.state == "visible" then
+							current_segment_text = current_segment_text .. char.char
+						elseif char.state == "fading" then
+							current_segment_text = current_segment_text .. string.format('<font transparency="%.2f">%s</font>', 1-char.progress, char.char)
+						end
+					end
+
+					renderer.label.Text = visible_text .. current_segment_text
+				end
+
+				segment_complete = processor:is_complete()
+
+				task.wait()
+			end
+
+			visible_text = visible_text .. seg_text
 		end
-
-		-- Check if complete
-		if processor:is_complete() then
-		renderer:render_final()
-		break
-		end
-
-		task.wait()
 	end
+
+	renderer:render_final()
 
 	return true
 end
