@@ -109,19 +109,19 @@ do
 
 	function DiaSegmentProcessor:update_fading_characters(fade_time, max_fades)
 		local updated = false
-		local activeFades = 0
+		local active_fades = 0
 
 		for i = 1, #self.characters do
 			local char = self.characters[i]
 			if char.state == "fading" then
-				activeFades = activeFades + 1
-				char.progress = math.min(1, (tick() - char.startTime)/fade_time)
+				active_fades = active_fades + 1
+				char.progress = math.min(1, (tick() - char.start_time)/fade_time)
 				if char.progress >= 1 then
 					char.state = "visible"
 				end
 				updated = true
 
-				if max_fades and activeFades >= max_fades then
+				if max_fades and active_fades >= max_fades then
 					break
 				end
 			end
@@ -220,7 +220,7 @@ function DiaSegmentMap.IsDiaSegmentMap(value)
 	return getmetatable(value) == DiaSegmentMap
 end
 
-function DiaSegmentMap:StepAndRender(text: string, label: TextLabel, config)
+function DiaSegmentMap.StepAndRender(text: string, label: TextLabel, config)
 	config = DialogueConfig.new()
 	local processor = DiaSegmentProcessor.new(text)
 	local renderer = CharMapRenderer.new(label)
@@ -230,17 +230,17 @@ function DiaSegmentMap:StepAndRender(text: string, label: TextLabel, config)
 	local startTime = tick()
 
 	while true do
-		local currentTime = tick() - startTime
-		local needsUpdate = false
+		local current_time = tick() - startTime
+		local needs_update = false
 
 		-- Process character state updates
-		local charUpdated = processor:advance_characters(currentTime, 1/config.cps)
-		local fadeUpdated = processor:update_fading_characters(config.fadeTime, config.maxFades)
+		local charUpdated = processor:advance_characters(current_time, 1/config.cps)
+		local fadeUpdated = processor:update_fading_characters(config.fade_time, config.max_fades)
 
-		needsUpdate = charUpdated or fadeUpdated
+		needs_update = charUpdated or fadeUpdated
 
 		-- Render if needed
-		if needsUpdate then
+		if needs_update then
 		renderer:render_characters(processor.characters)
 		end
 
