@@ -19,6 +19,11 @@ local CHAR_DELAYS = {
 	["|"] = 1.0
 }
 
+local FORMAT_TO_REMOVE = {
+	["|"] = true,
+	["_"] = true
+}
+
 local function parse_string_format(text)
 	local segments = Array()
 	local currentIndex = 1
@@ -117,6 +122,7 @@ do
 			if current_char and current_char.char then
 				pause_time = get_pause_duration(current_char.char)
 			end
+
 
 			if pause_time > 0 and current_char and current_char.state == "fading" then
 				self.last_char_time += pause_time
@@ -244,37 +250,6 @@ end
 
 function DiaSegmentMap.IsDiaSegmentMap(value)
 	return getmetatable(value) == DiaSegmentMap
-end
-
-local function calculate_pause_duration(char)
-	return CHAR_DELAYS[char] or 0
-end
-
-function DiaSegmentProcessor:advance_characters(current_time, char_delay)
-	local updated = false
-
-	while self.next_char_index <= #self.characters and current_time >= self.last_char_time + char_delay do
-		local current_char = self.characters[self.next_char_index - 1]
-		local pause_time = 0
-
-		if current_char and current_char.char then
-			pause_time = calculate_pause_duration(current_char.char)
-		end
-
-
-		if pause_time > 0 and current_char and current_char.state == "fading" then
-			self.last_char_time += pause_time
-			return updated
-		end
-
-		self.characters[self.next_char_index].state = "fading"
-		self.characters[self.next_char_index].start_time = tick()
-		self.last_char_time += char_delay
-		self.next_char_index += 1
-		updated = true
-	end
-
-	return updated
 end
 
 function DiaSegmentMap.StepAndRender(text: string, label: TextLabel, config)

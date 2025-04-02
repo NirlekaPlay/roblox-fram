@@ -14,20 +14,35 @@ local CharMap = {}
 CharMap.__index = CharMap
 
 setmetatable(CharMap, {
-	__call = function(_, text)
-		return CharMap.new(text)
+	__call = function(_, value)
+		return CharMap._new(value)
 	end
 })
 
 function CharMap.new(text: string)
-	return setmetatable({
-		_string = text or ""
-	}, CharMap)
+	local self = setmetatable({}, CharMap)
+
+	self._string = text or ""
+	self._map = self:Explode()
+
+	return self
+end
+
+function CharMap._new(value)
+	if type(value) == "string" then
+		return CharMap.new(value)
+	elseif CharMap.IsCharMap(value) then
+		return value
+	end
+
+	return nil
 end
 
 function CharMap:__index(index)
 	if CharMap[index] then
 		return CharMap[index]
+	elseif type(index) == "number" and self._map[index] then
+		return self._map[index]
 	else
 		return self._string[index]
 	end
@@ -166,6 +181,9 @@ end
 	Splits the string into an array of individual characters.
 ]=]
 function CharMap:Explode()
+	if self._map then
+		return self._map
+	end
 	local characters = {}
 
 	for i = 1, #self._string do
@@ -193,7 +211,7 @@ end
 	Returns true if the string does not have any characters.
 ]=]
 function CharMap:IsEmpty()
-	return CharMap:Length() == 0
+	return next(self._map) == nil
 end
 
 --[=[
